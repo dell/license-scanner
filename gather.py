@@ -17,6 +17,7 @@ import fnmatch
 import logging
 import sqlobject
 import inspect
+from multiprocessing import Pool, Process
 from optparse import OptionGroup
 from trace_decorator import decorate, traceLog, getLog
 
@@ -61,6 +62,7 @@ def add_cli_options(parser):
 
     group = OptionGroup(parser, "General Options")
     parser.add_option("--initdb", action="store_true", dest="initdb", help="Initialize storage Database", default=False)
+    parser.add_option("--worker-threads", action="store", type="int", dest="worker_threads", help="Set number of worker threads to use", default=4)
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Replace CMD defaults")
@@ -98,22 +100,43 @@ def connect(opts):
     if opts.initdb:
         createTables()
 
+decorate(traceLog())
 def gather_data(opts, dirpath, filename):
-    File(full_path=os.path.join(dirpath, filename), filename=filename)
+    moduleLog.info("Gather: %s" % os.path.join(dirpath,filename))
+    full_path=os.path.join(dirpath, filename)
+    data = {"full_path": full_path, "filename": filename}
+    data["FILE"] = call_output( ["file", "-b", full_path] ).strip()
+    data["DT_NEEDED"] = [ s for s in call_output([opts.cmd_scanelf, '-qF', '#F%n', full_path]).strip().split(",") if s ]
+    return data
 
+# SQLite has pretty crappy multithread performance
+# so we run this function in the main thread to serialize all access to the DB.
+decorate(traceLog())
+def insert_data(data):
+    f = File(full_path=data["full_path"], filename=data["filename"])
+    t = Tag(full_path=f, tag="FILE", info=data["FILE"])
+    for lib in data["DT_NEEDED"]:
+        t = Tag(full_path=f, tag="DT_NEEDED", info=lib)
 
-def main(): 
+def main():
     parser = basic_cli.get_basic_parser(usage=__doc__, version="%prog " + __VERSION__)
     add_cli_options(parser)
     opts, args = basic_cli.command_parse(parser, validate_fn=validate_args)
     # DO NOT LOG BEFORE THIS CALL:
     basic_cli.setupLogging(opts)
 
+    moduleLogVerbose.debug("Ensuring prerequisite programs are present.")
     check_prereqs(opts)
+
+    moduleLogVerbose.debug("Connecting to database.")
     connect(opts)
+
+    moduleLogVerbose.debug("setting up multiprocessing worker pool.")
+    pool = Pool(processes=opts.worker_threads)
 
     # Make Cache, gather data
     if not os.path.exists(opts.outputdir):
+        moduleLog.info("Output directory (%s) does not exist, creating." % opts.outputdir)
         os.makedirs(opts.outputdir)
 
     for dirpath, dirnames, filenames in os.walk(opts.inputdir):
@@ -121,8 +144,13 @@ def main():
             outpath = os.path.join(opts.outputdir, dirpath)
             if not os.path.exists(outpath):
                 os.makedirs(outpath)
-            gather_data(opts, dirpath, filename)
+            pool.apply_async(gather_data, [opts, dirpath, filename], callback=insert_data)
 
+    moduleLog.info("Done submitting work, closing pool.")
+    pool.close()
+    moduleLog.info("Waiting for pool processes to finish.")
+    pool.join()
+    moduleLog.info("Gather done")
     #print_license_report(opts)
 
     # Print out collected error list global global_error_list
@@ -144,7 +172,7 @@ class File(sqlobject.SQLObject):
     filename = sqlobject.StringCol()
     tags = sqlobject.MultipleJoin('Tags')
 
-class Tags(sqlobject.SQLObject):
+class Tag(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
     full_path = sqlobject.ForeignKey('File')
     tag = sqlobject.StringCol()
@@ -191,6 +219,18 @@ def create_library_xref(csvdict, xref):
             sys.stderr.write("="*79 + "\n")
     return xref
 
+decorate(traceLog())
+def call_output(*args, **kwargs):
+    null = open("/dev/null", "w")
+    try:
+        p = subprocess.Popen(*args, stderr=null, stdout=subprocess.PIPE, stdin=null, **kwargs)
+        ret = p.communicate()
+        moduleLogVerbose.debug("ret: %s" % (ret,))
+    finally:
+        null.close()
+    return ret[0]
+
+decorate(traceLog())
 def redirect_call(*args, **kwargs):
     close_stdout=0
     close_stderr=0
