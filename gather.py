@@ -66,6 +66,7 @@ def add_cli_options(parser):
     group = OptionGroup(parser, "General Options")
     parser.add_option("--initdb", action="store_true", dest="initdb", help="Initialize storage Database", default=False)
     parser.add_option("--worker-threads", action="store", type="int", dest="worker_threads", help="Set number of worker threads to use", default=None) # None autodetects # of threads based on # of CPUs
+    parser.add_option("--commit-interval", action="store", type="float", dest="commit_interval", help="Set database commit interval in seconds (0 to commit after every operation)", default=1.0) # None autodetects # of threads based on # of CPUs
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Replace CMD defaults")
@@ -186,8 +187,9 @@ def main():
             except Queue.Empty, e:
                 pass
 
-            if (time.time() - t) > 1.0:
-                moduleLogVerbose.info("==== Committing transaction ===")
+            timediff = time.time() - t
+            if timediff > opts.commit_interval:
+                moduleLogVerbose.info("==== Committing transaction ====================================")
                 trans.commit()
                 t = time.time()
 
