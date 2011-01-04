@@ -5,6 +5,9 @@
     program which reads output from readelf dumps and prints a link tree
 """
 
+## TODO
+# query DB before insert to prevent duplicates
+
 import csv
 import sys
 import os
@@ -16,7 +19,6 @@ import shutil
 import fnmatch
 import logging
 import sqlobject
-import inspect
 import multiprocessing
 import Queue
 import rpm
@@ -26,6 +28,7 @@ from trace_decorator import decorate, traceLog, getLog
 
 # our stuff
 import basic_cli
+import license_db
 
 __VERSION__="1.0"
 
@@ -84,26 +87,6 @@ def check_prereqs(opts):
         if ret != 0:
             raise PrereqError( "COULD NOT FIND PREREQUISITE: %s" % cmd )
 
-
-decorate(traceLog())
-def connect(opts):
-    if not os.path.exists(opts.dbpath):
-        opts.initdb = True
-
-    if opts.initdb:
-        if os.path.exists(opts.dbpath):
-            moduleLogVerbose.info("unlinking old db: %s" % opts.dbpath)
-            os.unlink(opts.dbpath)
-
-        if os.path.dirname(opts.dbpath) and not os.path.exists(os.path.dirname(opts.dbpath)):
-            os.makedirs(os.path.dirname(opts.dbpath))
-
-    moduleLogVerbose.info("Connecting to db at %s" % opts.dbpath)
-    sqlobject.sqlhub.processConnection = sqlobject.connectionForURI('sqlite://%s' % opts.dbpath)
-
-    if opts.initdb:
-        createTables()
-
 decorate(traceLog())
 def get_license(opts, full_path):
     ts = rpm.TransactionSet()
@@ -128,15 +111,15 @@ def gather_data(opts, dirpath, filename):
 decorate(traceLog())
 def insert_data(data):
     moduleLogVerbose.debug("Inserting: %s" % data["filename"])
-    f = File(full_path=data["full_path"], filename=data["filename"])
+    f = license_db.File(full_path=data["full_path"], filename=data["filename"])
 
     for lib in data["DT_NEEDED"]:
-        t = Tag(full_path=f, tag="DT_NEEDED", info=lib)
+        t = license_db.Tag(full_path=f, tag="DT_NEEDED", info=lib)
 
     skip_list = ("DT_NEEDED", "full_path", "filename")
     for key, value in data.items():
         if key in skip_list: continue
-        t = Tag(full_path=f, tag=key, info=value)
+        t = license_db.Tag(full_path=f, tag=key, info=value)
 
     moduleLogVerbose.info("Inserted : %s" % data["filename"])
 
@@ -162,7 +145,7 @@ def main():
             multiprocessing.Process(target=worker, args=(task_queue, done_queue)).start()
 
     moduleLogVerbose.debug("Connecting to database.")
-    connect(opts)
+    license_db.connect(opts)
 
     # Make Cache, gather data
     if not os.path.exists(opts.outputdir):
@@ -214,35 +197,6 @@ def main():
         keys.sort()
         for err in keys:
             sys.stderr.write(global_error_list[err] + "\n")
-
-
-# centralized place to set common sqlmeta class details
-class myMeta(sqlobject.sqlmeta):
-    lazyUpdate = False
-
-class File(sqlobject.SQLObject):
-    class sqlmeta(myMeta): pass
-    full_path = sqlobject.StringCol()
-    filename = sqlobject.StringCol()
-    tags = sqlobject.MultipleJoin('Tags')
-
-class Tag(sqlobject.SQLObject):
-    class sqlmeta(myMeta): pass
-    full_path = sqlobject.ForeignKey('File')
-    tag = sqlobject.StringCol()
-    info = sqlobject.StringCol()
-
-def createTables():
-    # fancy pants way to grab all classes in this file
-    # that are descendents of SQLObject and run .createTable() on them.
-    toCreate = [ value for key, value in globals().items()
-            if     inspect.isclass(value)
-               and value.__module__==__name__
-               and issubclass(value, sqlobject.SQLObject)
-         ]
-
-    for clas in toCreate:
-        clas.createTable(ifNotExists=True, createJoinTables=False)
 
 
 class CommentedFile:
