@@ -84,13 +84,10 @@ def tags_matching_any(fileobj, taglist):
             yield t
 
 decorate(traceLog())
-def get_license(filedata):
-    license_tags = ["LICENSE", "RPM"]  # preference order
-    for license_type in license_tags:
-        for license in filedata.licenses:
-            if license.license_type == license_type:
-                return license.license
-
+def get_license_soname(filedata, soname):
+    for fd in soname.needed_by:
+        pass
+        #return fd.
     return "NOT_FOUND"
 
 def main():
@@ -105,8 +102,8 @@ def main():
 
     for fname in license_db.Filedata.select():
         moduleLog.warning("%s" % fname.basename)
-        for library in fname.dt_needed:
-            moduleLog.warning("\t[%s] %s" % (get_license(fname), library.soname))
+        for soname in fname.dt_needed:
+            moduleLog.warning("\t[%s] %s" % (get_license_soname(fname, soname), soname.soname))
 
     # Print out collected error list global global_error_list
     if len(global_error_list.values()):

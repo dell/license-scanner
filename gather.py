@@ -101,6 +101,7 @@ def gather_data(opts, dirpath, basename):
     data = {"full_path": full_path, "basename": basename}
     data["FILE"] = call_output( ["file", "-b", full_path] ).strip()
     data["DT_NEEDED"] = [ s for s in call_output([opts.cmd_scanelf, '-qF', '#F%n', full_path]).strip().split(",") if s ]
+    data["SONAME"] = call_output([opts.cmd_scanelf, '-qF', '#F%S', full_path]).strip()
 
     license_data = get_license(opts, full_path)
     if license_data:
@@ -118,26 +119,58 @@ def gather_data_libs(opts, basename):
 
 decorate(traceLog())
 def insert_data(data):
-    from license_db import Filedata, Dtneeded, License, Tag
+    from license_db import Filedata, Soname, License, Tag
     moduleLogVerbose.debug("Check for existing: %s" % data["basename"])
     res = Filedata.select( Filedata.q.full_path == data["full_path"] )
     if res.count():
-        moduleLogVerbose.debug("\tFound existing, deleting.")
-        Filedata.delete(res.getOne().id)
+        moduleLogVerbose.debug("\tUsing existing.")
+        f = res.getOne()
+    else:
+        moduleLogVerbose.debug("Inserting")
+        f = license_db.Filedata(full_path=data["full_path"], basename=data["basename"])
 
-    moduleLogVerbose.debug("Inserting")
-    f = license_db.Filedata(full_path=data["full_path"], basename=data["basename"])
-
-
+    # add all dt_needed entries
     for lib in data.get("DT_NEEDED", []):
-        t = license_db.Dtneeded(filedata=f, soname=lib)
+        moduleLogVerbose.debug("\tadd DT_NEEDED: %s" %lib)
+        try:
+            soname = Soname.bySoname( lib )
+        except sqlobject.main.SQLObjectNotFound, e:
+            soname = Soname(soname=lib)
+        if soname not in f.dt_needed:
+            f.addDtNeeded(soname)
+    if data.has_key("DT_NEEDED"): del(data["DT_NEEDED"])
 
-    for license in data.get("LICENSE_RPM", []):
-        t = license_db.License(filedata=f, license=license, license_type="RPM")
+    # if soname was gathered, get soname object, or create if not present
+    soname=None
+    if data.get("SONAME"):
+        moduleLogVerbose.debug("\tadd SONAME: %s" % data["SONAME"])
+        try:
+            soname = Soname.bySoname(data["SONAME"])
+        except sqlobject.main.SQLObjectNotFound, e:
+            soname = Soname(soname=data["SONAME"])
+        for s in f.soname:
+            f.removeSoname(s)
+        f.addSoname(soname)
+        del(data["SONAME"])
 
-    skip_list = ("LICENSE_RPM", "DT_NEEDED", "full_path", "basename")
+
+    # if license was gathered, get license object, or create if not present
+    license=None
+    if data.get("LICENSE_RPM"):
+        moduleLogVerbose.debug("\tadd LICENSE: %s" % data["LICENSE_RPM"])
+        try:
+            license = License.byLicense(data["LICENSE_RPM"])
+        except sqlobject.main.SQLObjectNotFound, e:
+            license = License(license=data["LICENSE_RPM"], license_type="RPM")
+        for s in f.license:
+            f.removeLicense(s)
+        f.addLicense(license)
+        del(data["LICENSE_RPM"])
+
+    skip_list = ("full_path", "basename")
     for key, value in data.items():
         if key in skip_list: continue
+        moduleLogVerbose.debug("Add TAG: %s --> %s" % (key, value))
         t = license_db.Tag(filedata=f, tagname=key, tagvalue=value)
 
     moduleLogVerbose.info("Inserted : %s" % data["basename"])
@@ -190,6 +223,26 @@ def main():
                     moduleLogVerbose.info("==== Committing transaction ====================================")
                     start_time = time.time()
                     trans.commit()
+
+    # wait for previous gather pass to finish
+    while done_queue.qsize() or task_queue.qsize():
+        insert_data(done_queue.get())
+
+    trans.commit()
+    moduleLogVerbose.debug("next step")
+    for notused in range(2):
+        moduleLogVerbose.debug("pass %s" % notused)
+        for soname in license_db.Soname.select():
+            moduleLogVerbose.debug("ensuring data for soname: %s" % soname.soname)
+            task_queue.put((gather_data_libs, [opts, soname.soname], {}))
+            try:
+                insert_data(done_queue.get(block=False))
+            except Queue.Empty, e:
+                pass
+            if time.time() - start_time > opts.commit_interval:
+                moduleLogVerbose.info("==== Committing transaction ====================================")
+                start_time = time.time()
+                trans.commit()
 
     moduleLogVerbose.info("Stopping worker threads.")
     for i in range(opts.worker_threads):

@@ -32,29 +32,41 @@ class myMeta(sqlobject.sqlmeta):
 
 class Filedata(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
-    basename = sqlobject.StringCol()
+    basename  = sqlobject.StringCol()
     full_path = sqlobject.StringCol(alternateID=True)
-    dt_needed = sqlobject.MultipleJoin('Dtneeded')
-    licenses = sqlobject.MultipleJoin('License')
-    tags = sqlobject.MultipleJoin('Tag')
+    dt_needed = sqlobject.RelatedJoin('Soname', joinColumn='filedata_id', otherColumn='soname_id', intermediateTable='dt_needed_list', addRemoveName='DtNeeded')
+    soname = sqlobject.RelatedJoin('Soname', joinColumn='filedata_id', otherColumn='soname_id', intermediateTable='soname_list', addRemoveName='Soname')
+    license  = sqlobject.RelatedJoin('License', joinColumn='filedata_id', otherColumn='license_id', intermediateTable='filedata_license', addRemoveName='License')
+    tags      = sqlobject.MultipleJoin('Tag')
 
-# Only for ELF libraries with SONAME, this table will list the soname of the lib
+# for ELF libraries with SONAME, this table will list the soname of the lib (by related join)
+# for ELF libraries/executables, this table will list the DT_NEEDED entries (by related join)
 class Soname(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
-    filedata = sqlobject.ForeignKey('Filedata', cascade=True)
-    soname = sqlobject.StringCol()
+    soname = sqlobject.StringCol(alternateID=True)
+    needed_by = sqlobject.RelatedJoin('Soname', otherColumn='filedata_id', joinColumn='soname_id', intermediateTable='dt_needed_list', addRemoveName='FileThatRequires')
+    has_soname = sqlobject.RelatedJoin('Soname', otherColumn='filedata_id', joinColumn='soname_id', intermediateTable='soname_list', addRemoveName='FileWithSoname')
 
-# Only for ELF libraries/executables, this table will list the DT_NEEDED entries
-class Dtneeded(sqlobject.SQLObject):
+class DtNeededList(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
-    filedata = sqlobject.ForeignKey('Filedata', cascade=True)
-    soname = sqlobject.StringCol()
+    Soname = sqlobject.ForeignKey('Soname', cascade=True)
+    Filedata = sqlobject.ForeignKey('Filedata', cascade=True)
+
+class SonameList(sqlobject.SQLObject):
+    class sqlmeta(myMeta): pass
+    Soname = sqlobject.ForeignKey('Soname', cascade=True)
+    Filedata = sqlobject.ForeignKey('Filedata', cascade=True)
 
 class License(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
-    filedata = sqlobject.ForeignKey('Filedata', cascade=True)
-    license = sqlobject.StringCol()
+    license = sqlobject.StringCol(alternateID=True)
     license_type = sqlobject.StringCol()
+    filesWith  = sqlobject.RelatedJoin('License', otherColumn='filedata_id', joinColumn='license_id', intermediateTable='filedata_license', addRemoveName='FileWith')
+
+class FiledataLicense(sqlobject.SQLObject):
+    class sqlmeta(myMeta): pass
+    License = sqlobject.ForeignKey('License', cascade=True)
+    Filedata = sqlobject.ForeignKey('Filedata', cascade=True)
 
 class Tag(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
