@@ -44,8 +44,8 @@ class Filedata(sqlobject.SQLObject):
 class Soname(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
     soname = sqlobject.StringCol(alternateID=True)
-    needed_by = sqlobject.RelatedJoin('Soname', otherColumn='filedata_id', joinColumn='soname_id', intermediateTable='dt_needed_list', addRemoveName='FileThatRequires')
-    has_soname = sqlobject.RelatedJoin('Soname', otherColumn='filedata_id', joinColumn='soname_id', intermediateTable='soname_list', addRemoveName='FileWithSoname')
+    needed_by = sqlobject.RelatedJoin('Filedata', otherColumn='filedata_id', joinColumn='soname_id', intermediateTable='dt_needed_list', addRemoveName='FileThatRequires')
+    has_soname = sqlobject.RelatedJoin('Filedata', otherColumn='filedata_id', joinColumn='soname_id', intermediateTable='soname_list', addRemoveName='FileWithSoname')
 
 class DtNeededList(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
