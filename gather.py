@@ -61,7 +61,7 @@ def validate_args(opts, args):
 
 def add_cli_options(parser):
     group = OptionGroup(parser, "Scan control")
-    parser.add_option("-i", "--input-directory", action="store", dest="inputdir", help="specify input directory", default=None)
+    parser.add_option("-i", "--input-directory", action="append", dest="inputdir", help="specify input directory", default=[])
     parser.add_option("-o", "--output-directory", action="store", dest="outputdir", help="specify output directory", default=None)
     parser.add_option("-s", "--signoff-file", action="append", dest="signoff_fns", help="specify the signoff file", default=[])
     parser.add_option_group(group)
@@ -114,12 +114,12 @@ def insert_data(data):
     f = license_db.File(full_path=data["full_path"], filename=data["filename"])
 
     for lib in data["DT_NEEDED"]:
-        t = license_db.Tag(full_path=f, tag="DT_NEEDED", info=lib)
+        t = license_db.Tag(file=f, tagname="DT_NEEDED", tagvalue=lib)
 
     skip_list = ("DT_NEEDED", "full_path", "filename")
     for key, value in data.items():
         if key in skip_list: continue
-        t = license_db.Tag(full_path=f, tag=key, info=value)
+        t = license_db.Tag(file=f, tagname=key, tagvalue=value)
 
     moduleLogVerbose.info("Inserted : %s" % data["filename"])
 
@@ -157,31 +157,26 @@ def main():
     trans = sqlobject.sqlhub.processConnection.transaction()
     sqlobject.sqlhub.processConnection = trans
 
-    t = time.time()
-    for dirpath, dirnames, filenames in os.walk(opts.inputdir):
-        for filename in filenames:
-            outpath = os.path.join(opts.outputdir, dirpath)
-            if not os.path.exists(outpath):
-                os.makedirs(outpath)
-            task_queue.put((gather_data, [opts, dirpath, filename], {}))
-            moduleLogVerbose.debug("tasks: %s  done: %s" % (task_queue.qsize(), done_queue.qsize()))
-            try:
-                insert_data(done_queue.get(block=False))
-            except Queue.Empty, e:
-                pass
+    start_time = time.time()
+    for dir_to_process in opts.inputdir:
+        for dirpath, dirnames, filenames in os.walk(dir_to_process):
+            for filename in filenames:
+                task_queue.put((gather_data, [opts, dirpath, filename], {}))
+                try:
+                    insert_data(done_queue.get(block=False))
+                except Queue.Empty, e:
+                    pass
 
-            timediff = time.time() - t
-            if timediff > opts.commit_interval:
-                moduleLogVerbose.info("==== Committing transaction ====================================")
-                trans.commit()
-                t = time.time()
+                if time.time() - start_time > opts.commit_interval:
+                    moduleLogVerbose.info("==== Committing transaction ====================================")
+                    start_time = time.time()
+                    trans.commit()
 
     moduleLogVerbose.info("Stopping worker threads.")
     for i in range(opts.worker_threads):
         task_queue.put('STOP')
 
     while done_queue.qsize() or task_queue.qsize():
-        moduleLogVerbose.debug("tasks: %s  done: %s" % (task_queue.qsize(), done_queue.qsize()))
         insert_data(done_queue.get())
 
     moduleLog.info("Gather done")
