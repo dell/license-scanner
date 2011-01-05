@@ -30,17 +30,30 @@ def connect(opts):
 class myMeta(sqlobject.sqlmeta):
     lazyUpdate = False
 
-class File(sqlobject.SQLObject):
+class Filedata(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
+    basename = sqlobject.StringCol()
     full_path = sqlobject.StringCol()
-    filename = sqlobject.StringCol()
-    tags = sqlobject.MultipleJoin('Tags')
+    dt_needed = sqlobject.MultipleJoin('LibraryRef')
+    licenses = sqlobject.MultipleJoin('License')
+    tags = sqlobject.MultipleJoin('Tag')
+
+class LibraryRef(sqlobject.SQLObject):
+    class sqlmeta(myMeta): pass
+    filedata = sqlobject.ForeignKey('Filedata')
+    soname = sqlobject.StringCol()
+
+class License(sqlobject.SQLObject):
+    class sqlmeta(myMeta): pass
+    filedata = sqlobject.ForeignKey('Filedata')
+    license = sqlobject.StringCol()
+    license_type = sqlobject.StringCol()
 
 class Tag(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
-    full_path = sqlobject.ForeignKey('File')
-    tag = sqlobject.StringCol()
-    info = sqlobject.StringCol()
+    filedata = sqlobject.ForeignKey('Filedata')
+    tagname = sqlobject.StringCol()
+    tagvalue = sqlobject.StringCol()
 
 def createTables():
     # fancy pants way to grab all classes in this file

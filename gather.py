@@ -95,10 +95,10 @@ def get_license(opts, full_path):
         return ("LICENSE_RPM", h['license'])
 
 decorate(traceLog())
-def gather_data(opts, dirpath, filename):
-    moduleLog.info("Gather: %s" % os.path.join(dirpath,filename))
-    full_path=os.path.join(dirpath, filename)
-    data = {"full_path": full_path, "filename": filename}
+def gather_data(opts, dirpath, basename):
+    moduleLog.info("Gather: %s" % os.path.join(dirpath,basename))
+    full_path=os.path.join(dirpath, basename)
+    data = {"full_path": full_path, "basename": basename}
     data["FILE"] = call_output( ["file", "-b", full_path] ).strip()
     data["DT_NEEDED"] = [ s for s in call_output([opts.cmd_scanelf, '-qF', '#F%n', full_path]).strip().split(",") if s ]
 
@@ -110,18 +110,21 @@ def gather_data(opts, dirpath, filename):
 
 decorate(traceLog())
 def insert_data(data):
-    moduleLogVerbose.debug("Inserting: %s" % data["filename"])
-    f = license_db.File(full_path=data["full_path"], filename=data["filename"])
+    moduleLogVerbose.debug("Inserting: %s" % data["basename"])
+    f = license_db.Filedata(full_path=data["full_path"], basename=data["basename"])
 
-    for lib in data["DT_NEEDED"]:
-        t = license_db.Tag(file=f, tagname="DT_NEEDED", tagvalue=lib)
+    for lib in data.get("DT_NEEDED", []):
+        t = license_db.LibraryRef(filedata=f, soname=lib)
 
-    skip_list = ("DT_NEEDED", "full_path", "filename")
+    for license in data.get("LICENSE_RPM", []):
+        t = license_db.License(filedata=f, license=license, license_type="RPM")
+
+    skip_list = ("LICENSE_RPM", "DT_NEEDED", "full_path", "basename")
     for key, value in data.items():
         if key in skip_list: continue
-        t = license_db.Tag(file=f, tagname=key, tagvalue=value)
+        t = license_db.Tag(filedata=f, tagname=key, tagvalue=value)
 
-    moduleLogVerbose.info("Inserted : %s" % data["filename"])
+    moduleLogVerbose.info("Inserted : %s" % data["basename"])
 
 def main():
     parser = basic_cli.get_basic_parser(usage=__doc__, version="%prog " + __VERSION__)
@@ -160,8 +163,8 @@ def main():
     start_time = time.time()
     for dir_to_process in opts.inputdir:
         for dirpath, dirnames, filenames in os.walk(dir_to_process):
-            for filename in filenames:
-                task_queue.put((gather_data, [opts, dirpath, filename], {}))
+            for basename in filenames:
+                task_queue.put((gather_data, [opts, dirpath, basename], {}))
                 try:
                     insert_data(done_queue.get(block=False))
                 except Queue.Empty, e:
