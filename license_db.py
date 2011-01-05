@@ -33,25 +33,32 @@ class myMeta(sqlobject.sqlmeta):
 class Filedata(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
     basename = sqlobject.StringCol()
-    full_path = sqlobject.StringCol()
-    dt_needed = sqlobject.MultipleJoin('LibraryRef')
+    full_path = sqlobject.StringCol(alternateID=True)
+    dt_needed = sqlobject.MultipleJoin('Dtneeded')
     licenses = sqlobject.MultipleJoin('License')
     tags = sqlobject.MultipleJoin('Tag')
 
-class LibraryRef(sqlobject.SQLObject):
+# Only for ELF libraries with SONAME, this table will list the soname of the lib
+class Soname(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
-    filedata = sqlobject.ForeignKey('Filedata')
+    filedata = sqlobject.ForeignKey('Filedata', cascade=True)
+    soname = sqlobject.StringCol()
+
+# Only for ELF libraries/executables, this table will list the DT_NEEDED entries
+class Dtneeded(sqlobject.SQLObject):
+    class sqlmeta(myMeta): pass
+    filedata = sqlobject.ForeignKey('Filedata', cascade=True)
     soname = sqlobject.StringCol()
 
 class License(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
-    filedata = sqlobject.ForeignKey('Filedata')
+    filedata = sqlobject.ForeignKey('Filedata', cascade=True)
     license = sqlobject.StringCol()
     license_type = sqlobject.StringCol()
 
 class Tag(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
-    filedata = sqlobject.ForeignKey('Filedata')
+    filedata = sqlobject.ForeignKey('Filedata', cascade=True)
     tagname = sqlobject.StringCol()
     tagvalue = sqlobject.StringCol()
 

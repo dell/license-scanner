@@ -109,12 +109,28 @@ def gather_data(opts, dirpath, basename):
     return data
 
 decorate(traceLog())
+def gather_data_libs(opts, basename):
+    check_paths = [ '/lib', '/lib64', '/usr/lib', '/usr/lib64' ]
+    for i in check_paths:
+        candidate_path = os.path.join(i, basename)
+        if os.path.exists(candidate_path):
+            return gather_data(opts, i, basename)
+
+decorate(traceLog())
 def insert_data(data):
-    moduleLogVerbose.debug("Inserting: %s" % data["basename"])
+    from license_db import Filedata, Dtneeded, License, Tag
+    moduleLogVerbose.debug("Check for existing: %s" % data["basename"])
+    res = Filedata.select( Filedata.q.full_path == data["full_path"] )
+    if res.count():
+        moduleLogVerbose.debug("\tFound existing, deleting.")
+        Filedata.delete(res.getOne().id)
+
+    moduleLogVerbose.debug("Inserting")
     f = license_db.Filedata(full_path=data["full_path"], basename=data["basename"])
 
+
     for lib in data.get("DT_NEEDED", []):
-        t = license_db.LibraryRef(filedata=f, soname=lib)
+        t = license_db.Dtneeded(filedata=f, soname=lib)
 
     for license in data.get("LICENSE_RPM", []):
         t = license_db.License(filedata=f, license=license, license_type="RPM")
