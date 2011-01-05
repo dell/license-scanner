@@ -84,11 +84,36 @@ def tags_matching_any(fileobj, taglist):
             yield t
 
 decorate(traceLog())
-def get_license_soname(filedata, soname):
+def get_license(filedata, preferred=None):
+    if preferred is None: preferred = ["MANUAL", "RPM" ]
+    for pref in preferred:
+        for l in filedata.license:
+            if l.license_type == pref:
+                return l.license
+    # if we get here, there are no "preferred" licenses,
+    # so just return the first one
+    for l in filedata.license:
+        return l.license
+    return "NOT_FOUND_FD"
+
+decorate(traceLog())
+def get_license_soname(soname, preferred=None):
+    # try checking things with actual SONAME first
     for fd in soname.needed_by:
-        pass
-        #return fd.
-    return "NOT_FOUND"
+        lic = get_license(fd, preferred)
+        if lic != "NOT_FOUND_FD":
+            return lic
+
+    # then match just basename
+    from license_db import Filedata
+    moduleLogVerbose.debug("query by soname failed for %s." % soname.soname)
+    for fd in Filedata.select( Filedata.q.basename == soname.soname ):
+        moduleLogVerbose.debug("try to get license by %s" % fd.full_path)
+        lic = get_license(fd, preferred)
+        if lic != "NOT_FOUND_FD":
+            return lic
+
+    return "NOT_FOUND_LIB"
 
 def main():
     parser = basic_cli.get_basic_parser(usage=__doc__, version="%prog " + __VERSION__)
@@ -103,7 +128,7 @@ def main():
     for fname in license_db.Filedata.select():
         moduleLog.warning("%s" % fname.basename)
         for soname in fname.dt_needed:
-            moduleLog.warning("\t[%s] %s" % (get_license_soname(fname, soname), soname.soname))
+            moduleLog.warning("\t[%s] %s" % (get_license_soname(soname), soname.soname))
 
     # Print out collected error list global global_error_list
     if len(global_error_list.values()):
