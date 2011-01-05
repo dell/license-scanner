@@ -163,6 +163,7 @@ def insert_data(data):
         except sqlobject.main.SQLObjectNotFound, e:
             license = License(license=data["LICENSE_RPM"], license_type="RPM")
         for s in f.license:
+            if s.license_type != "RPM": continue
             f.removeLicense(s)
         f.addLicense(license)
         del(data["LICENSE_RPM"])
