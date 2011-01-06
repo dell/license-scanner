@@ -24,9 +24,9 @@ import Queue
 import rpm
 import time
 from optparse import OptionGroup
-from trace_decorator import decorate, traceLog, getLog
 
 # our stuff
+from trace_decorator import decorate, traceLog, getLog
 import basic_cli
 import license_db
 
