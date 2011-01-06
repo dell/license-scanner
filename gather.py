@@ -61,9 +61,10 @@ def validate_args(opts, args):
 
 def add_cli_options(parser):
     group = OptionGroup(parser, "Scan control")
-    parser.add_option("-i", "--input-directory", action="append", dest="inputdir", help="specify input directory", default=[])
-    parser.add_option("-o", "--output-directory", action="store", dest="outputdir", help="specify output directory", default=None)
+    parser.add_option("-i", "--input-directory", action="append", dest="inputdir", help="input directory to scan", default=[])
+    parser.add_option("-o", "--output-directory", action="store", dest="outputdir", help="where to store database", default=None)
     parser.add_option("-s", "--signoff-file", action="append", dest="signoff_fns", help="specify the signoff file", default=[])
+    parser.add_option("--gather-extra", action="store_true", dest="gather_lots", help="Gather extra data", default=False)
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "General Options")
@@ -74,15 +75,15 @@ def add_cli_options(parser):
 
     group = OptionGroup(parser, "Replace CMD defaults")
     group.add_option("--cmd-file", action="store", dest="cmd_file", help="specify file command", default="file")
-    group.add_option("--cmd-find", action="store", dest="cmd_find", help="specify find command", default="find")
-    group.add_option("--cmd-rpm", action="store", dest="cmd_rpm", help="specify rpm command", default="rpm")
     group.add_option("--cmd-objdump", action="store", dest="cmd_objdump", help="specify objdump command", default="objdump")
     group.add_option("--cmd-nm", action="store", dest="cmd_nm", help="specify nm command", default="nm")
     group.add_option("--cmd-scanelf", action="store", dest="cmd_scanelf", help="specify scanelf command", default="scanelf")
+    #group.add_option("--cmd-find", action="store", dest="cmd_find", help="specify find command", default="find")
+    #group.add_option("--cmd-rpm", action="store", dest="cmd_rpm", help="specify rpm command", default="rpm")
     parser.add_option_group(group)
 
 def check_prereqs(opts):
-    for cmd in [opts.cmd_find, opts.cmd_file, opts.cmd_rpm, opts.cmd_nm, opts.cmd_objdump, opts.cmd_scanelf]:
+    for cmd in [opts.cmd_file, opts.cmd_nm, opts.cmd_objdump, opts.cmd_scanelf]:
         ret = redirect_call(['which', cmd], stdout_fn="/dev/null", stderr_fn="/dev/null", stdin_fn="/dev/null",)
         if ret != 0:
             raise PrereqError( "COULD NOT FIND PREREQUISITE: %s" % cmd )
@@ -99,10 +100,11 @@ def gather_data(opts, dirpath, basename):
     moduleLog.info("Gather: %s" % os.path.join(dirpath,basename))
     full_path=os.path.join(dirpath, basename)
     data = {"full_path": full_path, "basename": basename}
-    data["FILE"] = call_output( ["file", "-b", full_path] ).strip()
-    data["NM"] = call_output( ["nm", full_path] ).strip()
-    data["NM_D"] = call_output( ["nm", "-D", full_path] ).strip()
-    data["OBJDUMP"] = call_output( ["objdump", "-x", full_path] ).strip()
+    data["FILE"] = call_output( [opts.cmd_file, "-b", full_path] ).strip()
+    if opts.gather_lots:
+        data["NM"] = call_output( [opts.cmd_nm, full_path] ).strip()
+        data["NM_D"] = call_output( [opts.cmd_nm, "-D", full_path] ).strip()
+        data["OBJDUMP"] = call_output( [opts.cmd_objdump, "-x", full_path] ).strip()
 
     dt_needed = [ s for s in call_output([opts.cmd_scanelf, '-qF', '#F%n', full_path]).strip().split(",") if s ]
     if dt_needed:
