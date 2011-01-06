@@ -178,9 +178,6 @@
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="model">treestore</property>
-                <property name="rules_hint">True</property>
-                <property name="search_column">0</property>
-                <property name="enable_tree_lines">True</property>
                 <child>
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_file">
                     <property name="title">File</property>
@@ -203,7 +200,6 @@
                     </child>
                   </object>
                 </child>
-
                 <child>
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_signoff">
                     <property name="title">Signoff</property>
@@ -215,7 +211,6 @@
                     </child>
                   </object>
                 </child>
-
                 <child>
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_comment">
                     <property name="title">Comment</property>
@@ -227,10 +222,6 @@
                     </child>
                   </object>
                 </child>
-
-
-
-
               </object>
             </child>
           </object>
