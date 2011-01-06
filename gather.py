@@ -101,6 +101,8 @@ def gather_data(opts, dirpath, basename):
     data = {"full_path": full_path, "basename": basename}
     data["FILE"] = call_output( ["file", "-b", full_path] ).strip()
     data["NM"] = call_output( ["nm", full_path] ).strip()
+    data["NM_D"] = call_output( ["nm", "-D", full_path] ).strip()
+    data["OBJDUMP"] = call_output( ["objdump", "-x", full_path] ).strip()
 
     dt_needed = [ s for s in call_output([opts.cmd_scanelf, '-qF', '#F%n', full_path]).strip().split(",") if s ]
     if dt_needed:
