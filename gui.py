@@ -56,23 +56,6 @@ def connect(opts):
     moduleLogVerbose.info("Connecting to db at %s" % opts.dbpath)
     sqlobject.sqlhub.processConnection = sqlobject.connectionForURI('sqlite://%s' % opts.dbpath)
 
-class QueryWrapper(object):
-    def __init__(self, query):
-        self.q = query
-        self.iter = iter(self.q)
-        self.current = self.iter.next()
-
-    def next(self):
-        try:
-            self.current = self.iter.next()
-        except StopIteration:
-            self.current = None
-            raise
-        return self.current
-
-    def __getattr__(self, name):
-        return getattr(self.iter, name)
-
 class MyTreeModel(gtk.GenericTreeModel):
                     # File, License, Signoff, Comment
     _column_types = [str, str, str, str]
