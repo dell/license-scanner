@@ -1,82 +1,236 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
-# example helloworld.py
+import os
+import sqlobject
+from optparse import OptionGroup
 
 import pygtk
-pygtk.require('2.0')
+pygtk.require("2.0")
 import gtk
 
-class HelloWorld:
+# our stuff
+from trace_decorator import decorate, traceLog, getLog
+import basic_cli
+import license_db
+import report
 
-    # This is a callback function. The data arguments are ignored
-    # in this example. More on callbacks below.
-    def hello(self, widget, data=None):
-        print "Hello World"
+__VERSION__="1.0"
 
-    def delete_event(self, widget, event, data=None):
-        # If you return FALSE in the "delete_event" signal handler,
-        # GTK will emit the "destroy" signal. Returning TRUE means
-        # you don't want the window to be destroyed.
-        # This is useful for popping up 'are you sure you want to quit?'
-        # type dialogs.
-        print "delete event occurred"
+global global_error_list
+global_error_list = {}
 
-        # Change FALSE to TRUE and the main window will not be destroyed
-        # with a "delete_event".
+moduleLog = getLog()
+moduleLogVerbose = getLog(prefix="verbose.")
+
+def validate_args(opts, args):
+    #if opts.inputdir: opts.inputdir = os.path.realpath(opts.inputdir)
+    if opts.database_dir: opts.database_dir = os.path.realpath(opts.database_dir)
+    if opts.database_dir is None:
+        raise basic_cli.CLIError("Database directory is required.")
+
+    opts.dbpath = os.path.join(opts.database_dir, "sqlite.db")
+    if not os.path.exists(opts.dbpath):
+        raise basic_cli.CLIError("DB doesnt exist.")
+
+    opts.signoff = {}
+    for csvfile in opts.signoff_fns:
+        try:
+            csvdict = csv.DictReader(CommentedFile(open(csvfile, "rb")))
+            create_library_xref(csvdict, opts.signoff)
+        except IOError, e:
+            pass # dont care if file doesnt exist
+
+
+def add_cli_options(parser):
+    group = OptionGroup(parser, "Scan control")
+    parser.add_option("-d", "--database-directory", action="store", dest="database_dir", help="specify input directory", default=None)
+    parser.add_option("-s", "--signoff-file", action="append", dest="signoff_fns", help="specify the signoff file", default=[])
+    parser.add_option_group(group)
+
+    group = OptionGroup(parser, "General Options")
+    parser.add_option_group(group)
+
+
+decorate(traceLog())
+def connect(opts):
+    moduleLogVerbose.info("Connecting to db at %s" % opts.dbpath)
+    sqlobject.sqlhub.processConnection = sqlobject.connectionForURI('sqlite://%s' % opts.dbpath)
+
+class QueryWrapper(object):
+    def __init__(self, query):
+        self.q = query
+        self.iter = iter(self.q)
+        self.current = self.iter.next()
+
+    def next(self):
+        try:
+            self.current = self.iter.next()
+        except StopIteration:
+            self.current = None
+            raise
+        return self.current
+
+    def __getattr__(self, name):
+        return getattr(self.iter, name)
+
+class MyTreeModel(gtk.GenericTreeModel):
+                    # File, License, Signoff, Comment
+    _column_types = [str, str, str, str]
+    _model_data = [('row %i'%n, 'string %i'%n, "string %i"%n, "string %i"%n) for n in range(10)]
+
+    def __init__(self, *args, **kargs):
+        gtk.GenericTreeModel.__init__(self)
+        self.fd = license_db.Filedata 
+
+    decorate(traceLog())
+    def on_get_flags(self):
+        return 0
+        #return gtk.TREE_MODEL_LIST_ONLY | gtk.TREE_MODEL_ITERS_PERSIST
+
+    decorate(traceLog())
+    def on_get_n_columns(self):
+        return len(self._column_types)
+
+    decorate(traceLog())
+    def on_get_column_type(self, index):
+        return self._column_types[index]
+
+    decorate(traceLog())
+    def on_get_iter(self, path):
+        q = self.fd.select()
+        p = path
+        c = q.count()
+        return {"query":q, "path": p, "count": c}
+
+    decorate(traceLog())
+    def on_get_path(self, rowref):
+        return rowref["path"]
+
+    decorate(traceLog())
+    def on_get_value(self, rowref, column):
+        q = rowref["query"]
+        p = rowref["path"][0]
+        filedata = q[p:p+1].getOne()
+        if column == 0:
+            return filedata.basename
+        elif column == 1:
+            return report.get_license(filedata)
+        elif column == 2:
+            try:
+                return report.tags_matching(filedata, "SIGNOFF").next()
+            except StopIteration, e:
+                return ""
+        elif column == 3:
+            try:
+                return report.tags_matching(filedata, "COMMENT").next()
+            except StopIteration, e:
+                return ""
+
+    decorate(traceLog())
+    def on_iter_next(self, rowref):
+        rowref["path"] = (rowref["path"][0]+1,)
+        if rowref["path"][0] < rowref["count"]:
+            return rowref
+        
+
+    decorate(traceLog())
+    def on_iter_children(self, rowref):
+        if rowref:
+            return None
+        return self.on_get_iter((0,))
+
+    decorate(traceLog())
+    def on_iter_has_child(self, rowref):
         return False
 
-    def destroy(self, widget, data=None):
-        print "destroy signal occurred"
-        gtk.main_quit()
+    decorate(traceLog())
+    def on_iter_n_children(self, rowref):
+        if rowref:
+            return 0
+        return self.fd.select().count()
 
+    decorate(traceLog())
+    def on_iter_nth_child(self, parent, n):
+        if parent:
+            return None
+        return self.on_get_iter( (n,) )
+        
+        
+    decorate(traceLog())
+    def on_iter_parent(self, rowref):
+        return None
+
+
+class LicenseScanApp(object):       
     def __init__(self):
-        # create a new window
-        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-    
-        # When the window is given the "delete_event" signal (this is given
-        # by the window manager, usually by the "close" option, or on the
-        # titlebar), we ask it to call the delete_event () function
-        # as defined above. The data passed to the callback
-        # function is NULL and is ignored in the callback function.
-        self.window.connect("delete_event", self.delete_event)
-    
-        # Here we connect the "destroy" event to a signal handler.  
-        # This event occurs when we call gtk_widget_destroy() on the window,
-        # or if we return FALSE in the "delete_event" callback.
-        self.window.connect("destroy", self.destroy)
-    
-        # Sets the border width of the window.
-        self.window.set_border_width(10)
-    
-        # Creates a new button with the label "Hello World".
-        self.button = gtk.Button("Hello World")
-    
-        # When the button receives the "clicked" signal, it will call the
-        # function hello() passing it None as its argument.  The hello()
-        # function is defined above.
-        self.button.connect("clicked", self.hello, None)
-    
-        # This will cause the window to be destroyed by calling
-        # gtk_widget_destroy(window) when "clicked".  Again, the destroy
-        # signal could come from here, or the window manager.
-        self.button.connect_object("clicked", gtk.Widget.destroy, self.window)
-    
-        # This packs the button into the window (a GTK container).
-        self.window.add(self.button)
-    
-        # The final step is to display this newly created widget.
-        self.button.show()
-    
-        # and the window
+        builder = gtk.Builder()
+        builder.add_from_file("gui.glade")
+        builder.connect_signals(self)
+
+        # get main objects
+        self.window = builder.get_object("window")
+        self.statusbar = builder.get_object("treestore")
+        self.treestore = builder.get_object("treestore")
+        self.treeview = builder.get_object("treeview")
+
+        # 
+        self.listmodel = MyTreeModel()
+        self.treeview.set_model(model=self.listmodel)
+
         self.window.show()
 
-    def main(self):
-        # All PyGTK applications must have a gtk.main(). Control ends here
-        # and waits for an event to occur (like a key press or mouse event).
-        gtk.main()
+    def file_quit(self, widget, data=None):
+        gtk.main_quit()
 
-# If the program is run directly or passed as an argument to the python
-# interpreter then create a HelloWorld instance and show it
+    def on_window_destroy(self, widget, data=None):
+        gtk.main_quit()
+
+class CommentedFile:
+    def __init__(self, f, commentstring="#"):
+        self.f = f
+        self.commentstring = commentstring
+
+    def next(self):
+        line = self.f.next()
+        while (line[0] in self.commentstring) or line == "":
+            line = self.f.next()
+        return line
+
+    def __iter__(self):
+        return self
+
+
+def create_library_xref(csvdict, xref):
+    for line in csvdict:
+        try:
+            d = xref.get(line["LIBRARY"], {})
+            d[line["APPLICABLE"]] = line
+            xref[line["LIBRARY"]] = d
+        except Exception, e:
+            sys.stderr.write("="*79 + "\n")
+            sys.stderr.write("Ignoring parsing error in CSV file:")
+            traceback.print_exc()
+            sys.stderr.write("="*79 + "\n")
+    return xref
+
+
 if __name__ == "__main__":
-    hello = HelloWorld()
-    hello.main()
+    parser = basic_cli.get_basic_parser(usage=__doc__, version="%prog " + __VERSION__)
+    add_cli_options(parser)
+    opts, args = basic_cli.command_parse(parser, validate_fn=validate_args)
+    # DO NOT LOG BEFORE THIS CALL:
+    basic_cli.setupLogging(opts)
+
+    moduleLogVerbose.debug("Connecting to database.")
+    connect(opts)
+
+    app = LicenseScanApp()
+
+    # we'll add some test data now - 4 rows with 3 child rows each
+    for parent in range(4):
+        piter = app.treestore.append(None, ['parent %i' % parent, "license", "signoff", "comment"])
+        for child in range(3):
+            app.treestore.append(piter, ['child %i of parent %i' %
+                                          (child, parent), "license", "signoff", "comment"])
+
+    gtk.main()
