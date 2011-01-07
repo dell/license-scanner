@@ -251,38 +251,40 @@ def main():
         except Queue.Empty, e:
             pass
 
+    # initial loop to scan all files in the input directory
     for dir_to_process in opts.inputdir:
         for dirpath, dirnames, filenames in os.walk(dir_to_process):
             for basename in filenames:
                 task_queue.put((gather_data, [opts, dirpath, basename], {}))
                 process_one(done_queue, insert_data, interval_timer, block=False)
 
-    # loop here until we stop getting new data
+    # a function that waits for all previously-submitted work to complete before
+    # going on. Returns True if any records were inserted
+    def wait_for_completion():
+        # wait for previous gather pass to finish
+        inserted_something = False
+        for i in range(opts.worker_threads):
+            task_queue.put(("barrier", [], {}))
+        while done_queue.qsize() or task_queue.qsize():
+            if process_one(done_queue, insert_data, interval_timer, block=True):
+                inserted_something = True
+        return inserted_something
+
+    # Then we have to make sure we get data for each of the sonames we found
+    wait_for_completion()
     inserted_something = True
     pass_no = 0
     while inserted_something:
         inserted_something = False
         pass_no=pass_no + 1
         moduleLogVerbose.debug("Scan sonames, pass %s" % pass_no)
-        moduleLogVerbose.debug("qsize: %s/%s" % (task_queue.qsize(),done_queue.qsize()))
-        # wait for previous gather pass to finish
-        for i in range(opts.worker_threads):
-            task_queue.put(("barrier", [], {}))
-        while done_queue.qsize() or task_queue.qsize():
-            if process_one(done_queue, insert_data, interval_timer, block=True):
-                inserted_something = True
-        moduleLogVerbose.debug("qsize: %s/%s" % (task_queue.qsize(),done_queue.qsize()))
         for soname in license_db.Soname.select():
             moduleLogVerbose.debug("ensuring data for soname: %s" % soname.soname)
             task_queue.put((gather_data_libs, [opts, soname.soname], {}))
             if process_one(done_queue, insert_data, interval_timer, block=False):
                 inserted_something = True
-        # wait for previous gather pass to finish
-        for i in range(opts.worker_threads):
-            task_queue.put(("barrier", [], {}))
-        while done_queue.qsize() or task_queue.qsize():
-            if process_one(done_queue, insert_data, interval_timer, block=True):
-                inserted_something = True
+        if wait_for_completion():
+            inserted_something = True
 
     moduleLogVerbose.info("no more work")
 
