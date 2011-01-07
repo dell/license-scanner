@@ -13,6 +13,7 @@ import gtk
 from trace_decorator import decorate, traceLog, getLog
 import basic_cli
 import license_db
+import gather
 import report
 
 __VERSION__="1.0"
@@ -115,6 +116,7 @@ class MyTreeModel(gtk.GenericTreeModel):
         try:
             filedata = q[p:p+1].getOne()
         except sqlobject.main.SQLObjectNotFound, e:
+            #should never happen
             return "nonexistent row: %s" % repr(rowref["path"])
 
         if column == 0:
@@ -138,7 +140,6 @@ class MyTreeModel(gtk.GenericTreeModel):
         rowref["path"] = rowref["path"][:-1] + (rowref["path"][-1]+1,)
         if rowref["path"][-1] < rowref["count"]:
             return rowref
-        
 
     decorate(traceLog())
     def on_iter_children(self, rowref):
@@ -200,35 +201,6 @@ class LicenseScanApp(object):
 
     def on_window_destroy(self, widget, data=None):
         gtk.main_quit()
-
-class CommentedFile:
-    def __init__(self, f, commentstring="#"):
-        self.f = f
-        self.commentstring = commentstring
-
-    def next(self):
-        line = self.f.next()
-        while (line[0] in self.commentstring) or line == "":
-            line = self.f.next()
-        return line
-
-    def __iter__(self):
-        return self
-
-
-def create_library_xref(csvdict, xref):
-    for line in csvdict:
-        try:
-            d = xref.get(line["LIBRARY"], {})
-            d[line["APPLICABLE"]] = line
-            xref[line["LIBRARY"]] = d
-        except Exception, e:
-            sys.stderr.write("="*79 + "\n")
-            sys.stderr.write("Ignoring parsing error in CSV file:")
-            traceback.print_exc()
-            sys.stderr.write("="*79 + "\n")
-    return xref
-
 
 if __name__ == "__main__":
     parser = basic_cli.get_basic_parser(usage=__doc__, version="%prog " + __VERSION__)

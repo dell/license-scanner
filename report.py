@@ -26,6 +26,7 @@ from trace_decorator import decorate, traceLog, getLog
 # our stuff
 import basic_cli
 import license_db
+import gather
 
 __VERSION__="1.0"
 
@@ -138,34 +139,6 @@ def main():
         for err in keys:
             sys.stderr.write(global_error_list[err] + "\n")
 
-
-class CommentedFile:
-    def __init__(self, f, commentstring="#"):
-        self.f = f
-        self.commentstring = commentstring
-
-    def next(self):
-        line = self.f.next()
-        while (line[0] in self.commentstring) or line == "":
-            line = self.f.next()
-        return line
-
-    def __iter__(self):
-        return self
-
-
-def create_library_xref(csvdict, xref):
-    for line in csvdict:
-        try:
-            d = xref.get(line["LIBRARY"], {})
-            d[line["APPLICABLE"]] = line
-            xref[line["LIBRARY"]] = d
-        except Exception, e:
-            sys.stderr.write("="*79 + "\n")
-            sys.stderr.write("Ignoring parsing error in CSV file:")
-            traceback.print_exc()
-            sys.stderr.write("="*79 + "\n")
-    return xref
 
 if __name__ == "__main__":
     try:
