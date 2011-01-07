@@ -12,6 +12,7 @@ import gtk
 from trace_decorator import decorate, traceLog, getLog
 import basic_cli
 import license_db
+import report
 
 __VERSION__="1.0"
 
@@ -81,79 +82,80 @@ class MyTreeModel(gtk.GenericTreeModel):
         gtk.GenericTreeModel.__init__(self)
         self.fd = license_db.Filedata 
 
-    #decorate(traceLog())
+    decorate(traceLog())
     def on_get_flags(self):
         return gtk.TREE_MODEL_LIST_ONLY | gtk.TREE_MODEL_ITERS_PERSIST
 
-    #decorate(traceLog())
+    decorate(traceLog())
     def on_get_n_columns(self):
         return len(self._column_types)
 
-    #decorate(traceLog())
+    decorate(traceLog())
     def on_get_column_type(self, index):
         return self._column_types[index]
 
     decorate(traceLog())
     def on_get_iter(self, path):
-        query = QueryWrapper(self.fd.select())
-        if path[0] == 0:
-            return query
-        try:
-            while 1:
-                fd = query.next()
-                if fd.id == path[0]:
-                    return query
-        except StopIteration:
-            return None
+        q = self.fd.select()
+        p = path
+        c = q.count()
+        return {"query":q, "path": p, "count": c}
 
-    #decorate(traceLog())
+    decorate(traceLog())
     def on_get_path(self, rowref):
-        return rowref.current.id
+        return rowref["path"]
 
-    #decorate(traceLog())
+    decorate(traceLog())
     def on_get_value(self, rowref, column):
+        q = rowref["query"]
+        p = rowref["path"][0]
+        filedata = q[p:p+1].getOne()
         if column == 0:
-            return rowref.current.basename
+            return filedata.basename
         elif column == 1:
-            return "license"
+            return report.get_license(filedata)
         elif column == 2:
-            return "signoff"
+            try:
+                return report.tags_matching(filedata, "SIGNOFF").next()
+            except StopIteration, e:
+                return ""
         elif column == 3:
-            return "comment"
+            try:
+                return report.tags_matching(filedata, "COMMENT").next()
+            except StopIteration, e:
+                return ""
 
     decorate(traceLog())
     def on_iter_next(self, rowref):
-        try:
-            rowref.next()
+        rowref["path"] = (rowref["path"][0]+1,)
+        if rowref["path"][0] < rowref["count"]:
             return rowref
-        except StopIteration:
-            return None
+        
 
-    #decorate(traceLog())
+    decorate(traceLog())
     def on_iter_children(self, rowref):
         if rowref:
             return None
         return self.on_get_iter((0,))
 
-    #decorate(traceLog())
+    decorate(traceLog())
     def on_iter_has_child(self, rowref):
         return False
 
-    #decorate(traceLog())
+    decorate(traceLog())
     def on_iter_n_children(self, rowref):
         if rowref:
             return 0
         return self.fd.select().count()
 
-    #decorate(traceLog())
+    decorate(traceLog())
     def on_iter_nth_child(self, parent, n):
         if parent:
             return None
-        query = QueryWrapper(self.fd.select())
-        for x in range(n):  query.next()
-        return query
-
-    #decorate(traceLog())
+        return self.on_get_iter( (n,) )
+        
+        
+    decorate(traceLog())
     def on_iter_parent(self, rowref):
         return None
 
