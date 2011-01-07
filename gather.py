@@ -50,20 +50,11 @@ def validate_args(opts, args):
 
     opts.dbpath = os.path.join(opts.outputdir, "sqlite.db")
 
-    opts.signoff = {}
-    for csvfile in opts.signoff_fns:
-        try:
-            csvdict = csv.DictReader(CommentedFile(open(csvfile, "rb")))
-            create_library_xref(csvdict, opts.signoff)
-        except IOError, e:
-            pass # dont care if file doesnt exist
-
 
 def add_cli_options(parser):
     group = OptionGroup(parser, "Scan control")
     parser.add_option("-i", "--input-directory", action="append", dest="inputdir", help="input directory to scan", default=[])
     parser.add_option("-o", "--output-directory", action="store", dest="outputdir", help="where to store database", default=None)
-    parser.add_option("-s", "--signoff-file", action="append", dest="signoff_fns", help="specify the signoff file", default=[])
     parser.add_option("--gather-extra", action="store_true", dest="gather_lots", help="Gather extra data", default=False)
     parser.add_option_group(group)
 
@@ -231,7 +222,6 @@ def main():
     moduleLogVerbose.debug("Connecting to database.")
     license_db.connect(opts)
 
-    # Make Cache, gather data
     if not os.path.exists(opts.outputdir):
         moduleLog.warning("Output directory (%s) does not exist, creating." % opts.outputdir)
         os.makedirs(opts.outputdir)
@@ -320,35 +310,6 @@ def create_interval_timer(timeout, func, args, kargs, debug_message=None):
                 moduleLogVerbose.debug(debug_message)
             func(*args, **kargs)
     return f
-
-
-class CommentedFile:
-    def __init__(self, f, commentstring="#"):
-        self.f = f
-        self.commentstring = commentstring
-
-    def next(self):
-        line = self.f.next()
-        while (line[0] in self.commentstring) or line == "":
-            line = self.f.next()
-        return line
-
-    def __iter__(self):
-        return self
-
-
-def create_library_xref(csvdict, xref):
-    for line in csvdict:
-        try:
-            d = xref.get(line["LIBRARY"], {})
-            d[line["APPLICABLE"]] = line
-            xref[line["LIBRARY"]] = d
-        except Exception, e:
-            sys.stderr.write("="*79 + "\n")
-            sys.stderr.write("Ignoring parsing error in CSV file:")
-            traceback.print_exc()
-            sys.stderr.write("="*79 + "\n")
-    return xref
 
 decorate(traceLog())
 def call_output(*args, **kwargs):

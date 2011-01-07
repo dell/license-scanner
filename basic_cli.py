@@ -34,6 +34,11 @@ def get_basic_parser(usage=None, version=None):
     group.add_option("--module-trace", action="append", dest="tracemodules", help="Enable function tracing only for specified modules", default=[])
     parser.add_option_group(group)
 
+    group = OptionGroup(parser, "Config Inputs")
+    parser.add_option("--signoff-file", action="append", dest="signoff_fns", help="File with license signoffs", default=[])
+    parser.add_option("--license-compat-file", action="append", dest="license_compat_fns", help="File with license compatibility information", default=[])
+    parser.add_option_group(group)
+
     return parser
 
 def command_parse(parser=None, validate_fn=None):
@@ -54,8 +59,65 @@ def command_parse(parser=None, validate_fn=None):
 # only used for example purposes and unit testing
 def __validate_args(opts, args):
     # do stuff here to validate that the options given are valid
-    if False:
-        raise CLIError("Output directory is required.")
+    opts.signoff = {}
+    for csvfile in opts.signoff_fns:
+        try:
+            csvdict = csv.DictReader(CommentedFile(open(csvfile, "rb")))
+            create_library_xref(csvdict, opts.signoff)
+        except IOError, e:
+            pass # dont care if file doesnt exist
+
+    opts.license_compat = {}
+    for csvfile in opts.license_compat_fns:
+        try:
+            csvdict = csv.DictReader(CommentedFile(open(csvfile, "rb")))
+            create_library_xref(csvdict, opts.license_compat)
+        except IOError, e:
+            pass # dont care if file doesnt exist
+
+
+
+class CommentedFile:
+    def __init__(self, f, commentstring="#"):
+        self.f = f
+        self.commentstring = commentstring
+
+    def next(self):
+        line = self.f.next()
+        while (line[0] in self.commentstring) or line == "":
+            line = self.f.next()
+        return line
+
+    def __iter__(self):
+        return self
+
+def create_license_compat_xref(csvdict, xref):
+    for line in csvdict:
+        try:
+            d = xref.get(line["LICENSE"], [])
+            d.append(line["COMPAT_LICENSE"])
+            xref[line["LICENSE"]] = d
+        except Exception, e:
+            sys.stderr.write("="*79 + "\n")
+            sys.stderr.write("Ignoring parsing error in CSV file:")
+            traceback.print_exc()
+            sys.stderr.write("="*79 + "\n")
+    return xref
+
+def create_library_xref(csvdict, xref):
+    for line in csvdict:
+        try:
+            d = xref.get(line["LIBRARY"], {})
+            d[line["APPLICABLE"]] = line
+            xref[line["LIBRARY"]] = d
+        except Exception, e:
+            sys.stderr.write("="*79 + "\n")
+            sys.stderr.write("Ignoring parsing error in CSV file:")
+            traceback.print_exc()
+            sys.stderr.write("="*79 + "\n")
+    return xref
+
+
 
 # only used for unit testing
 decorate(traceLog())

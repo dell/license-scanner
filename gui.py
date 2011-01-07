@@ -34,19 +34,10 @@ def validate_args(opts, args):
     if not os.path.exists(opts.dbpath):
         raise basic_cli.CLIError("DB doesnt exist.")
 
-    opts.signoff = {}
-    for csvfile in opts.signoff_fns:
-        try:
-            csvdict = csv.DictReader(CommentedFile(open(csvfile, "rb")))
-            create_library_xref(csvdict, opts.signoff)
-        except IOError, e:
-            pass # dont care if file doesnt exist
-
 
 def add_cli_options(parser):
     group = OptionGroup(parser, "Scan control")
     parser.add_option("-d", "--database-directory", action="store", dest="database_dir", help="specify input directory", default=None)
-    parser.add_option("-s", "--signoff-file", action="append", dest="signoff_fns", help="specify the signoff file", default=[])
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "General Options")
@@ -213,12 +204,5 @@ if __name__ == "__main__":
     connect(opts)
 
     app = LicenseScanApp()
-
-    # we'll add some test data now - 4 rows with 3 child rows each
-    for parent in range(4):
-        piter = app.treestore.append(None, ['parent %i' % parent, "license", "signoff", "comment"])
-        for child in range(3):
-            app.treestore.append(piter, ['child %i of parent %i' %
-                                          (child, parent), "license", "signoff", "comment"])
 
     gtk.main()
