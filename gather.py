@@ -221,6 +221,7 @@ def main():
     done_queue = multiprocessing.Queue()
     def worker(input, output):
         for func, args, kwargs in iter(input.get, 'STOP'):
+            if func == "barrier": continue
             result = func(*args, **kwargs)
             output.put(result)
     if opts.worker_threads is None: opts.worker_threads=1
@@ -263,16 +264,22 @@ def main():
         inserted_something = False
         pass_no=pass_no + 1
         moduleLogVerbose.debug("Scan sonames, pass %s" % pass_no)
+        moduleLogVerbose.debug("qsize: %s/%s" % (task_queue.qsize(),done_queue.qsize()))
         # wait for previous gather pass to finish
+        for i in range(opts.worker_threads):
+            task_queue.put(("barrier", [], {}))
         while done_queue.qsize() or task_queue.qsize():
             if process_one(done_queue, insert_data, interval_timer, block=True):
                 inserted_something = True
+        moduleLogVerbose.debug("qsize: %s/%s" % (task_queue.qsize(),done_queue.qsize()))
         for soname in license_db.Soname.select():
             moduleLogVerbose.debug("ensuring data for soname: %s" % soname.soname)
             task_queue.put((gather_data_libs, [opts, soname.soname], {}))
             if process_one(done_queue, insert_data, interval_timer, block=False):
                 inserted_something = True
         # wait for previous gather pass to finish
+        for i in range(opts.worker_threads):
+            task_queue.put(("barrier", [], {}))
         while done_queue.qsize() or task_queue.qsize():
             if process_one(done_queue, insert_data, interval_timer, block=True):
                 inserted_something = True
