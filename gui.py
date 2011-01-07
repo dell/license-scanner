@@ -128,8 +128,9 @@ class MyTreeModel(gtk.GenericTreeModel):
 
     decorate(traceLog())
     def on_iter_next(self, rowref):
-        rowref["path"] = (rowref["path"][0]+1,)
-        if rowref["path"][0] < rowref["count"]:
+        # increment last element
+        rowref["path"] = rowref["path"][:-1] + (rowref["path"][-1]+1,)
+        if rowref["path"][-1] < rowref["count"]:
             return rowref
         
 
@@ -158,7 +159,10 @@ class MyTreeModel(gtk.GenericTreeModel):
         
     decorate(traceLog())
     def on_iter_parent(self, rowref):
-        return None
+        parent = rowref["path"][:-1]
+        if not parent:
+            parent = (0,)
+        return paretn
 
 
 class LicenseScanApp(object):       
