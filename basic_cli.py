@@ -9,7 +9,10 @@ import sys
 import logging
 import logging.config
 import ConfigParser
+import traceback
 from optparse import OptionParser, OptionGroup
+
+# our stuff
 from trace_decorator import decorate, traceLog, getLog
 
 __VERSION__="1.0"
@@ -73,7 +76,7 @@ def __validate_args(opts, args):
     for csvfile in opts.license_compat_fns:
         try:
             csvdict = csv.DictReader(CommentedFile(open(csvfile, "rb")))
-            create_library_xref(csvdict, opts.license_compat)
+            create_license_compat_xref(csvdict, opts.license_compat)
         except IOError, e:
             pass # dont care if file doesnt exist
 
