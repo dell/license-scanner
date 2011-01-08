@@ -107,6 +107,43 @@ def get_license_soname(soname, preferred=None):
 
     return "NOT_FOUND_LIB"
 
+def license_is_compatible(opts, lic1, lic2):
+    if lic1 == lic2:
+        return True
+    if lic2 in opts.license_compat.get(lic1, []):
+        return True
+    return False
+
+
+def get_stuff(opts, filedata, myfault=0):
+    from license_db import DtNeededList
+    q = DtNeededList.select( DtNeededList.q.Filedata == filedata.id ).throughTo.Soname.throughTo.has_soname
+    retlist = []
+    compatible = True
+
+    for soname in q:
+        culprit = False
+        # check license compatibility of all direct, first-level children
+        if not license_is_compatible(opts, get_license(filedata), get_license(soname)):
+            compatible = False
+            culprit = True
+        # now flip our bit to false if any of our children has incompatibilities
+        for deps in get_stuff(opts, soname, culprit):
+            if not deps["compatible"]:
+                compatible = False
+
+            deps["level"] = deps["level"] + 1
+            retlist.append(deps)
+
+    yield {
+        "level": 0,
+        "culprit": myfault,
+        "compatible": compatible,
+        "filedata": filedata,
+        }
+    for i in retlist:
+        yield i
+
 def main():
     parser = basic_cli.get_basic_parser(usage=__doc__, version="%prog " + __VERSION__)
     add_cli_options(parser)
@@ -118,9 +155,19 @@ def main():
     connect(opts)
 
     for fname in license_db.Filedata.select():
-        moduleLog.warning("%s" % fname.basename)
-        for soname in fname.dt_needed:
-            moduleLog.warning("\t[%s] %s" % (get_license_soname(soname), soname.soname))
+        for info in get_stuff(opts, fname):
+            compat = "%s[%s] %s"
+            if not info["compatible"]:
+                compat = "%s**((%s)) %s"
+            elif info["culprit"]:
+                compat = "%s-->((%s)) %s"
+
+            moduleLog.warning(compat % ("    "*info["level"], get_license(info["filedata"]), info["filedata"].basename))
+
+#    for fname in license_db.Filedata.select():
+#        moduleLog.warning("%s" % fname.basename)
+#        for soname in fname.dt_needed:
+#            moduleLog.warning("\t[%s] %s" % (get_license_soname(soname), soname.soname))
 
     # Print out collected error list global global_error_list
     if len(global_error_list.values()):
