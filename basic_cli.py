@@ -4,6 +4,7 @@
     This is the basic_cli module which has some helper functions to make writing cli progs easier. If you run it from the CLI as a program, it runs in unit test mode.
 """
 
+import csv
 import sys
 import logging
 import logging.config
@@ -50,6 +51,7 @@ def command_parse(parser=None, validate_fn=None):
         opts.conf = ConfigParser.ConfigParser()
         opts.conf.read(opts.configfile)
 
+    __validate_args(opts, args)
     if validate_fn is not None:
         validate_fn(opts, args)
 
