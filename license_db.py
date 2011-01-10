@@ -25,6 +25,118 @@ def connect(opts):
     if opts.initdb:
         createTables()
 
+decorate(traceLog())
+def tags_matching(fileobj, tagname):
+    for t in fileobj.tags:
+        if t.tagname == tagname:
+            yield t
+
+decorate(traceLog())
+def tags_matching_any(fileobj, taglist):
+    for t in fileobj.tags:
+        if t.tagname in taglist:
+            yield t
+
+decorate(traceLog())
+def get_license(filedata, preferred=None):
+    if preferred is None: preferred = ["MANUAL", "RPM" ]
+    for pref in preferred:
+        for l in filedata.license:
+            if l.license_type == pref:
+                return l.license
+    # if we get here, there are no "preferred" licenses,
+    # so just return the first one
+    for l in filedata.license:
+        return l.license
+    return "NOT_FOUND_FD"
+
+decorate(traceLog())
+def get_license_soname(soname, preferred=None):
+    # try checking things with actual SONAME first
+    for fd in soname.needed_by:
+        lic = get_license(fd, preferred)
+        if lic != "NOT_FOUND_FD":
+            return lic
+
+    # then match just basename
+    from license_db import Filedata
+    moduleLogVerbose.debug("query by soname failed for %s." % soname.soname)
+    for fd in Filedata.select( Filedata.q.basename == soname.soname ):
+        moduleLogVerbose.debug("try to get license by %s" % fd.full_path)
+        lic = get_license(fd, preferred)
+        if lic != "NOT_FOUND_FD":
+            return lic
+
+    return "NOT_FOUND_LIB"
+
+decorate(traceLog())
+def license_is_compatible(opts, lic1, lic2):
+    if lic1 == lic2:
+        return True
+    if lic2 in opts.license_compat.get(lic1, []):
+        return True
+    return False
+
+# some constants for our users
+iter_topdown = 0
+iter_bottomup = 1
+
+decorate(traceLog())
+def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, iter_direction=iter_topdown, break_on_incompatible=0):
+    from license_db import DtNeededList
+    q = DtNeededList.select( DtNeededList.q.Filedata == filedata.id ).throughTo.Soname.throughTo.has_soname
+    retlist = []
+    inforec = { "level": 0, "culprit": myfault, "compatible": True, "filedata": filedata }
+
+    # iter_direction=0 == top-down
+    # iter_direction=1 == bottom-up (more efficient, but results in opposite order from normal display order)
+
+    # check license compatibility of all direct, first-level children
+    for soname in q:
+        if break_on_incompatible > 2:
+            break
+        culprit = False
+        # check child license compatibility
+        if not license_is_compatible(opts, get_license(filedata), get_license(soname)):
+            inforec["compatible"] = False
+            culprit = True
+            if break_on_incompatible:
+                break
+
+        # tell our kid if he is the source of the license incompatibility (using 'culprit' param)
+        for dep in iter_over_dt_needed(opts, soname, filedata, culprit, iter_direction=iter_direction):
+            # now flip our bit to false if any of our children has incompatibilities
+            if not dep["compatible"]:
+                inforec["compatible"] = False
+                if break_on_incompatible:
+                    break_on_incompatible = 2
+                    break
+
+            # we have to check license compatility with all descendents, too
+            if not license_is_compatible(opts, get_license(filedata), get_license(dep["filedata"])):
+                inforec["compatible"] = False
+                dep["culprit"] = True
+                if break_on_incompatible:
+                    break_on_incompatible = 2
+                    break
+
+            dep["level"] = dep["level"] + 1
+
+            if get_all:
+                if iter_direction == iter_bottomup:
+                    yield dep
+                else:
+                    retlist.append(dep)
+
+            # prevent endless recursion (should never happen)
+            if dep["level"] > 256:
+                break
+
+    yield inforec
+    if get_all and iter_direction == iter_topdown:
+        for i in retlist:
+            yield i
+
 
 # centralized place to set common sqlmeta class details
 class myMeta(sqlobject.sqlmeta):
@@ -49,8 +161,8 @@ class Soname(sqlobject.SQLObject):
 
 class DtNeededList(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
-    Soname = sqlobject.ForeignKey('Soname', cascade=True)
     Filedata = sqlobject.ForeignKey('Filedata', cascade=True)
+    Soname = sqlobject.ForeignKey('Soname', cascade=True)
 
 class SonameList(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
