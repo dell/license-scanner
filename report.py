@@ -63,92 +63,6 @@ def connect(opts):
     moduleLogVerbose.info("Connecting to db at %s" % opts.dbpath)
     sqlobject.sqlhub.processConnection = sqlobject.connectionForURI('sqlite://%s' % opts.dbpath)
 
-decorate(traceLog())
-def tags_matching(fileobj, tagname):
-    for t in fileobj.tags:
-        if t.tagname == tagname:
-            yield t
-
-decorate(traceLog())
-def tags_matching_any(fileobj, taglist):
-    for t in fileobj.tags:
-        if t.tagname in taglist:
-            yield t
-
-decorate(traceLog())
-def get_license(filedata, preferred=None):
-    if preferred is None: preferred = ["MANUAL", "RPM" ]
-    for pref in preferred:
-        for l in filedata.license:
-            if l.license_type == pref:
-                return l.license
-    # if we get here, there are no "preferred" licenses,
-    # so just return the first one
-    for l in filedata.license:
-        return l.license
-    return "NOT_FOUND_FD"
-
-decorate(traceLog())
-def get_license_soname(soname, preferred=None):
-    # try checking things with actual SONAME first
-    for fd in soname.needed_by:
-        lic = get_license(fd, preferred)
-        if lic != "NOT_FOUND_FD":
-            return lic
-
-    # then match just basename
-    from license_db import Filedata
-    moduleLogVerbose.debug("query by soname failed for %s." % soname.soname)
-    for fd in Filedata.select( Filedata.q.basename == soname.soname ):
-        moduleLogVerbose.debug("try to get license by %s" % fd.full_path)
-        lic = get_license(fd, preferred)
-        if lic != "NOT_FOUND_FD":
-            return lic
-
-    return "NOT_FOUND_LIB"
-
-def license_is_compatible(opts, lic1, lic2):
-    if lic1 == lic2:
-        return True
-    if lic2 in opts.license_compat.get(lic1, []):
-        return True
-    return False
-
-
-def get_stuff(opts, filedata, myfault=0):
-    from license_db import DtNeededList
-    q = DtNeededList.select( DtNeededList.q.Filedata == filedata.id ).throughTo.Soname.throughTo.has_soname
-    retlist = []
-    compatible = True
-
-    for soname in q:
-        culprit = False
-        # check license compatibility of all direct, first-level children
-        if not license_is_compatible(opts, get_license(filedata), get_license(soname)):
-            compatible = False
-            culprit = True
-        # tell our kid if he is the source of the license incompatibility
-        for deps in get_stuff(opts, soname, culprit):
-            # now flip our bit to false if any of our children has incompatibilities
-            if not deps["compatible"]:
-                compatible = False
-
-            deps["level"] = deps["level"] + 1
-            retlist.append(deps)
-
-            # prevent endless recursion (should never happen)
-            if deps["level"] > 256:
-                break
-
-    yield {
-        "level": 0,
-        "culprit": myfault,
-        "compatible": compatible,
-        "filedata": filedata,
-        }
-    for i in retlist:
-        yield i
-
 def main():
     parser = basic_cli.get_basic_parser(usage=__doc__, version="%prog " + __VERSION__)
     add_cli_options(parser)
@@ -160,10 +74,10 @@ def main():
     connect(opts)
 
     for fname in license_db.Filedata.select():
-        for info in get_stuff(opts, fname):
+        for info in license_db.iter_over_dt_needed(opts, fname):
             interpolate = {}
             interpolate["basename"] = info["filedata"].basename
-            interpolate["license"]  = get_license(info["filedata"])
+            interpolate["license"]  = license_db.get_license(info["filedata"])
             interpolate["level"]    = "    " * info["level"]
 
             if not info["compatible"]:
@@ -175,10 +89,7 @@ def main():
 
             moduleLog.warning(fmtstring.format(**interpolate))
 
-#    for fname in license_db.Filedata.select():
-#        moduleLog.warning("%s" % fname.basename)
-#        for soname in fname.dt_needed:
-#            moduleLog.warning("\t[%s] %s" % (get_license_soname(soname), soname.soname))
+    sqlobject.sqlhub.processConnection.close()
 
     # Print out collected error list global global_error_list
     if len(global_error_list.values()):
