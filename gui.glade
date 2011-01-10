@@ -96,7 +96,6 @@
               <object class="GtkTreeView" id="treeview">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
-                <property name="model">treestore</property>
                 <child>
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_file">
                     <property name="resizable">True</property>
@@ -105,6 +104,17 @@
                       <object class="GtkCellRendererText" id="cellrenderer_file"/>
                       <attributes>
                         <attribute name="text">0</attribute>
+                      </attributes>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkTreeViewColumn" id="treeviewcolumn_icon">
+                    <property name="title">Status</property>
+                    <child>
+                      <object class="GtkCellRendererPixbuf" id="cellrenderer_icon"/>
+                      <attributes>
+                        <attribute name="stock-id">4</attribute>
                       </attributes>
                     </child>
                   </object>

@@ -50,8 +50,8 @@ def connect(opts):
     sqlobject.sqlhub.processConnection = sqlobject.connectionForURI('sqlite://%s' % opts.dbpath)
 
 class MyTreeModel(gtk.GenericTreeModel):
-                    # File, License, Signoff, Comment
-    _column_types = [str, str, str, str]
+                    # File, License, Signoff, Comment, STOCK_ID
+    _column_types = [str, str, str, str, str ]
     _model_data = [('row %i'%n, 'string %i'%n, "string %i"%n, "string %i"%n) for n in range(10)]
 
     def __init__(self, *args, **kargs):
@@ -124,6 +124,8 @@ class MyTreeModel(gtk.GenericTreeModel):
                 return report.tags_matching(filedata, "COMMENT").next()
             except StopIteration, e:
                 return ""
+        elif column == 4:
+            return gtk.STOCK_YES
 
     decorate(traceLog())
     def on_iter_next(self, rowref):
