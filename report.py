@@ -161,13 +161,19 @@ def main():
 
     for fname in license_db.Filedata.select():
         for info in get_stuff(opts, fname):
-            compat = "%s[%s] %s"
-            if not info["compatible"]:
-                compat = "%s**((%s)) %s"
-            elif info["culprit"]:
-                compat = "%s-->((%s)) %s"
+            interpolate = {}
+            interpolate["basename"] = info["filedata"].basename
+            interpolate["license"]  = get_license(info["filedata"])
+            interpolate["level"]    = "    " * info["level"]
 
-            moduleLog.warning(compat % ("    "*info["level"], get_license(info["filedata"]), info["filedata"].basename))
+            if not info["compatible"]:
+                fmtstring = "{level}{basename}    **(({license}))"
+            elif info["culprit"]:
+                fmtstring = "{level}{basename}    -->(({license}))"
+            else:
+                fmtstring = "{level}{basename}    [{license}]"
+
+            moduleLog.warning(fmtstring.format(**interpolate))
 
 #    for fname in license_db.Filedata.select():
 #        moduleLog.warning("%s" % fname.basename)
