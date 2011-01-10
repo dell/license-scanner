@@ -113,19 +113,23 @@ class MyTreeModel(gtk.GenericTreeModel):
         if column == 0:
             return filedata.basename
         elif column == 1:
-            return report.get_license(filedata)
+            return license_db.get_license(filedata)
         elif column == 2:
             try:
-                return report.tags_matching(filedata, "SIGNOFF").next()
+                return license_db.tags_matching(filedata, "SIGNOFF").next()
             except StopIteration, e:
                 return ""
         elif column == 3:
             try:
-                return report.tags_matching(filedata, "COMMENT").next()
+                return license_db.tags_matching(filedata, "COMMENT").next()
             except StopIteration, e:
                 return ""
         elif column == 4:
-            return gtk.STOCK_YES
+            # iter, but will only ever return one record
+            for info in license_db.iter_over_dt_needed(opts, filedata, get_all=False, iter_direction=license_db.iter_bottomup, break_on_incompatible=1):
+                if info["compatible"]:
+                    return gtk.STOCK_YES
+                return gtk.STOCK_NO
 
     decorate(traceLog())
     def on_iter_next(self, rowref):
@@ -208,3 +212,5 @@ if __name__ == "__main__":
     app = LicenseScanApp()
 
     gtk.main()
+
+    sqlobject.sqlhub.processConnection.close()
