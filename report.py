@@ -127,13 +127,18 @@ def get_stuff(opts, filedata, myfault=0):
         if not license_is_compatible(opts, get_license(filedata), get_license(soname)):
             compatible = False
             culprit = True
-        # now flip our bit to false if any of our children has incompatibilities
+        # tell our kid if he is the source of the license incompatibility
         for deps in get_stuff(opts, soname, culprit):
+            # now flip our bit to false if any of our children has incompatibilities
             if not deps["compatible"]:
                 compatible = False
 
             deps["level"] = deps["level"] + 1
             retlist.append(deps)
+
+            # prevent endless recursion (should never happen)
+            if deps["level"] > 256:
+                break
 
     yield {
         "level": 0,
