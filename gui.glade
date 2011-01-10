@@ -17,7 +17,7 @@
   <object class="GtkWindow" id="window">
     <property name="default_width">640</property>
     <property name="default_height">520</property>
-    <signal name="destroy" handler="file_quit"/>
+    <signal name="destroy" handler="on_window_destroy"/>
     <child>
       <object class="GtkVBox" id="vbox1">
         <property name="visible">True</property>
@@ -40,11 +40,11 @@
                     </child>
                     <child>
                       <object class="GtkImageMenuItem" id="imagemenuitem5">
-                        <property name="label">gtk-quit</property>
                         <property name="visible">True</property>
+                        <property name="related_action">action_quit</property>
+                        <property name="use_action_appearance">True</property>
                         <property name="use_underline">True</property>
                         <property name="use_stock">True</property>
-                        <signal name="activate" handler="file_quit"/>
                       </object>
                     </child>
                   </object>
@@ -80,6 +80,28 @@
         <child>
           <object class="GtkToolbar" id="toolbar">
             <property name="visible">True</property>
+            <child>
+              <object class="GtkToolButton" id="toolbutton_quit">
+                <property name="visible">True</property>
+                <property name="related_action">action_quit</property>
+                <property name="use_action_appearance">True</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="homogeneous">True</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkToolButton" id="toolbutton1">
+                <property name="visible">True</property>
+                <property name="related_action">action_save</property>
+                <property name="use_action_appearance">True</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="homogeneous">True</property>
+              </packing>
+            </child>
           </object>
           <packing>
             <property name="expand">False</property>
@@ -96,6 +118,7 @@
               <object class="GtkTreeView" id="treeview">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
+                <signal name="button_press_event" handler="on_treeview_button_press_event"/>
                 <child>
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_file">
                     <property name="resizable">True</property>
@@ -174,5 +197,40 @@
         </child>
       </object>
     </child>
+  </object>
+  <object class="GtkMenu" id="popup_menu">
+    <property name="visible">True</property>
+    <child>
+      <object class="GtkImageMenuItem" id="add_license_compatibility">
+        <property name="label" translatable="yes">_Add License Compatibility Record</property>
+        <property name="visible">True</property>
+        <property name="use_underline">True</property>
+        <property name="image">image1</property>
+        <property name="use_stock">False</property>
+        <signal name="activate" handler="add_license_compatibility_activate_cb"/>
+      </object>
+    </child>
+  </object>
+  <object class="GtkImage" id="image1">
+    <property name="visible">True</property>
+    <property name="stock">gtk-add</property>
+    <property name="icon-size">1</property>
+  </object>
+  <object class="GtkActionGroup" id="global_actions"/>
+  <object class="GtkAction" id="action_quit">
+    <property name="label">_Quit</property>
+    <property name="short_label">Quit</property>
+    <property name="tooltip">Exit the application</property>
+    <property name="stock_id">gtk-quit</property>
+    <property name="is_important">True</property>
+    <signal name="activate" handler="on_action_quit_activate"/>
+  </object>
+  <object class="GtkAction" id="action_save">
+    <property name="label">_Save</property>
+    <property name="short_label">Save</property>
+    <property name="tooltip">Save edited data</property>
+    <property name="stock_id">gtk-save</property>
+    <property name="is_important">True</property>
+    <signal name="activate" handler="on_action_save_activate"/>
   </object>
 </interface>

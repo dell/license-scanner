@@ -101,13 +101,19 @@ class MyTreeModel(gtk.GenericTreeModel):
         return rowref["path"]
 
     decorate(traceLog())
-    def on_get_value(self, rowref, column):
+    def get_filedata_from_rowref_iter(self, rowref):
         q = rowref["query"]
         p = rowref["path"][-1]
         try:
-            filedata = q[p:p+1].getOne()
+            return q[p:p+1].getOne()
         except sqlobject.main.SQLObjectNotFound, e:
             #should never happen
+            return None
+
+    decorate(traceLog())
+    def on_get_value(self, rowref, column):
+        filedata = self.get_filedata_from_rowref_iter(rowref)
+        if filedata is None:
             return "nonexistent row: %s" % repr(rowref["path"])
 
         if column == 0:
@@ -166,7 +172,6 @@ class MyTreeModel(gtk.GenericTreeModel):
 
         return self.on_get_iter( parent["path"] + (n,) )
         
-        
     decorate(traceLog())
     def on_iter_parent(self, rowref):
         parent = rowref["path"][:-1]
@@ -176,7 +181,11 @@ class MyTreeModel(gtk.GenericTreeModel):
 
 
 class LicenseScanApp(object):       
-    def __init__(self):
+    def __init__(self, opts):
+        # save config data/cli opts
+        self.opts = opts
+
+        # initialize from glade
         builder = gtk.Builder()
         builder.add_from_file("gui.glade")
         builder.connect_signals(self)
@@ -186,15 +195,68 @@ class LicenseScanApp(object):
         self.statusbar = builder.get_object("treestore")
         self.treestore = builder.get_object("treestore")
         self.treeview = builder.get_object("treeview")
+        self.popup    = builder.get_object("popup_menu")
 
-        # 
+        # Set up model
         self.listmodel = MyTreeModel()
         self.treeview.set_model(model=self.listmodel)
 
+        # actions
+        self.global_actions = builder.get_object("global_actions")
+        self.action_quit = builder.get_object("action_quit")
+        self.action_save = builder.get_object("action_save")
+        for action in (self.action_quit, self.action_save):
+            self.global_actions.add_action(action)
+
         self.window.show()
 
-    def file_quit(self, widget, data=None):
+    def add_license_compatibility_activate_cb(self, *args, **kargs):
+        selection = self.treeview.get_selection()
+        model, selected = selection.get_selected_rows()
+        #print "args: %s  kargs: %s" % (repr(args), repr(kargs))
+        for path in selected:
+            print "add_license_compat: %s" % repr(path)
+            rowref = model.on_get_iter(path)
+            parent_path = path[:-1]
+            parent_rowref = model.on_get_iter(parent_path)
+            filedata = model.get_filedata_from_rowref_iter(rowref)
+            parent_filedata = model.get_filedata_from_rowref_iter(parent_rowref)
+
+            compat = self.opts.license_compat.get(license_db.get_license(parent_filedata), [])
+            compat.append(license_db.get_license(filedata))
+            self.opts.license_compat[license_db.get_license(parent_filedata)] = compat
+
+    def on_treeview_button_press_event(self, treeview, event):
+        if event.button == 3:
+            x = int(event.x)
+            y = int(event.y)
+            time = event.time
+            pthinfo = treeview.get_path_at_pos(x, y)
+            if pthinfo is not None and len(pthinfo[0]) > 1:
+                path, col, cellx, celly = pthinfo
+                print "PATH: %s" % repr(path)
+                treeview.grab_focus()
+                treeview.set_cursor( path, col, 0)
+                self.popup.popup( None, None, None, event.button, time)
+            return True
+
+    def on_window_destroy(self, *args, **kargs):
+        self.action_quit.activate()
+
+    def on_action_quit_activate(self, *args, **kargs):
         gtk.main_quit()
+
+    def on_action_save_activate(self, *args, **kargs):
+        print "SAVE!"
+        import csv
+        fd = open("OUTFILE.csv", "wb+")
+        fd.write('LICENSE,COMPAT_LICENSE\n')
+        fd.flush()
+        writer = csv.writer(fd, ("LICENSE", "COMPAT_LICENSE"))
+        for lic, compat_licenses in self.opts.license_compat.items():
+            for row in compat_licenses:
+                writer.writerow((lic, row))
+        fd.close()
 
     def on_window_destroy(self, widget, data=None):
         gtk.main_quit()
@@ -209,7 +271,7 @@ if __name__ == "__main__":
     moduleLogVerbose.debug("Connecting to database.")
     connect(opts)
 
-    app = LicenseScanApp()
+    app = LicenseScanApp(opts)
 
     gtk.main()
 
