@@ -52,11 +52,11 @@ def connect(opts):
 class MyTreeModel(gtk.GenericTreeModel):
                     # File, License, Signoff, Comment, STOCK_ID
     _column_types = [str, str, str, str, str ]
-    _model_data = [('row %i'%n, 'string %i'%n, "string %i"%n, "string %i"%n) for n in range(10)]
+    columns = {"basename":0, "license":1, "signoff":2, "comment":3, "compatible":4, "bad_license_list":5}
 
     def __init__(self, *args, **kargs):
         gtk.GenericTreeModel.__init__(self)
-        self.fd = license_db.Filedata 
+        self.fd = license_db.Filedata
 
     decorate(traceLog())
     def on_get_flags(self):
@@ -116,26 +116,32 @@ class MyTreeModel(gtk.GenericTreeModel):
         if filedata is None:
             return "nonexistent row: %s" % repr(rowref["path"])
 
-        if column == 0:
+        if column == self.columns["basename"]:
             return filedata.basename
-        elif column == 1:
+        elif column == self.columns["license"]:
             return license_db.get_license(filedata)
-        elif column == 2:
+        elif column == self.columns["signoff"]:
             try:
                 return license_db.tags_matching(filedata, "SIGNOFF").next()
             except StopIteration, e:
                 return ""
-        elif column == 3:
+        elif column == self.columns["comment"]:
             try:
                 return license_db.tags_matching(filedata, "COMMENT").next()
             except StopIteration, e:
                 return ""
-        elif column == 4:
+        elif column == self.columns["compatible"]:
             # iter, but will only ever return one record
-            for info in license_db.iter_over_dt_needed(opts, filedata, get_all=False, iter_direction=license_db.iter_bottomup, break_on_incompatible=1):
+            for info in license_db.iter_over_dt_needed(opts, filedata, get_all=False):
                 if info["compatible"]:
                     return gtk.STOCK_YES
+                elif info["incompat_licenses"]:
+                    return gtk.STOCK_REDO
                 return gtk.STOCK_NO
+        elif column == self.columns["bad_license_list"]:
+            # iter, but will only ever return one record
+            for info in license_db.iter_over_dt_needed(opts, filedata, get_all=False):
+                return info["incompat_licenses"]
 
     decorate(traceLog())
     def on_iter_next(self, rowref):
@@ -171,7 +177,7 @@ class MyTreeModel(gtk.GenericTreeModel):
             return self.on_get_iter( (n,) )
 
         return self.on_get_iter( parent["path"] + (n,) )
-        
+
     decorate(traceLog())
     def on_iter_parent(self, rowref):
         parent = rowref["path"][:-1]
@@ -180,7 +186,7 @@ class MyTreeModel(gtk.GenericTreeModel):
         return self.on_get_iter(parent)
 
 
-class LicenseScanApp(object):       
+class LicenseScanApp(object):
     def __init__(self, opts):
         # save config data/cli opts
         self.opts = opts
@@ -198,8 +204,8 @@ class LicenseScanApp(object):
         self.popup    = builder.get_object("popup_menu")
 
         # Set up model
-        self.listmodel = MyTreeModel()
-        self.treeview.set_model(model=self.listmodel)
+        self.treemodel = MyTreeModel()
+        self.treeview.set_model(model=self.treemodel)
 
         # actions
         self.global_actions = builder.get_object("global_actions")
@@ -210,21 +216,22 @@ class LicenseScanApp(object):
 
         self.window.show()
 
-    def add_license_compatibility_activate_cb(self, *args, **kargs):
-        selection = self.treeview.get_selection()
-        model, selected = selection.get_selected_rows()
-        #print "args: %s  kargs: %s" % (repr(args), repr(kargs))
-        for path in selected:
-            print "add_license_compat: %s" % repr(path)
-            rowref = model.on_get_iter(path)
-            parent_path = path[:-1]
-            parent_rowref = model.on_get_iter(parent_path)
-            filedata = model.get_filedata_from_rowref_iter(rowref)
-            parent_filedata = model.get_filedata_from_rowref_iter(parent_rowref)
+    def add_license_compatibility_activate_cb(self, widget, userdata, *args, **kargs):
+        path = userdata[0]
+        good_lic = userdata[1]
+        bad_lic = userdata[2]
+        arr = self.opts.license_compat.get(good_lic, [])
+        arr.append(bad_lic)
+        self.opts.license_compat[good_lic] = arr
 
-            compat = self.opts.license_compat.get(license_db.get_license(parent_filedata), [])
-            compat.append(license_db.get_license(filedata))
-            self.opts.license_compat[license_db.get_license(parent_filedata)] = compat
+    def _make_menu(self, path, good_lic, licenses, event, time):
+        m = gtk.Menu()
+        for l in licenses:
+            i = gtk.MenuItem("Add: %s" % l)
+            i.show()
+            m.append(i)
+            i.connect("activate", self.add_license_compatibility_activate_cb, (path, good_lic, l))
+        m.popup(None, None, None, event.button, event.time, None)
 
     def on_treeview_button_press_event(self, treeview, event):
         if event.button == 3:
@@ -232,12 +239,15 @@ class LicenseScanApp(object):
             y = int(event.y)
             time = event.time
             pthinfo = treeview.get_path_at_pos(x, y)
-            if pthinfo is not None and len(pthinfo[0]) > 1:
+            if pthinfo is not None:
                 path, col, cellx, celly = pthinfo
-                print "PATH: %s" % repr(path)
-                treeview.grab_focus()
-                treeview.set_cursor( path, col, 0)
-                self.popup.popup( None, None, None, event.button, time)
+                rowref = self.treemodel.on_get_iter(path)
+                lic_list = self.treemodel.on_get_value(rowref, self.treemodel.columns["bad_license_list"])
+                good_lic = self.treemodel.on_get_value(rowref, self.treemodel.columns["license"])
+                if lic_list:
+                    treeview.grab_focus()
+                    treeview.set_cursor( path, col, 0)
+                    self._make_menu(path, good_lic, lic_list, event, time)
             return True
 
     def on_window_destroy(self, *args, **kargs):
@@ -247,7 +257,6 @@ class LicenseScanApp(object):
         gtk.main_quit()
 
     def on_action_save_activate(self, *args, **kargs):
-        print "SAVE!"
         import csv
         fd = open("OUTFILE.csv", "wb+")
         fd.write('LICENSE,COMPAT_LICENSE\n')

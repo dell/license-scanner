@@ -79,17 +79,19 @@ def license_is_compatible(opts, lic1, lic2):
 
 # some constants for our users
 iter_topdown = 0
-iter_bottomup = 1
+iter_bottomup = 1 # (more efficient, but results in opposite order from normal display order)
 
 decorate(traceLog())
-def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, iter_direction=iter_topdown, break_on_incompatible=0):
+def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, break_on_incompatible=0):
     from license_db import DtNeededList
     q = DtNeededList.select( DtNeededList.q.Filedata == filedata.id ).throughTo.Soname.throughTo.has_soname
     retlist = []
-    inforec = { "level": 0, "culprit": myfault, "compatible": True, "filedata": filedata }
+    inforec = { "level": 0, "culprit": myfault, "compatible": True, "filedata": filedata, 'incompat_licenses':[] }
 
-    # iter_direction=0 == top-down
-    # iter_direction=1 == bottom-up (more efficient, but results in opposite order from normal display order)
+    def uniq_add(*args):
+        for l in args:
+            if l not in  inforec["incompat_licenses"]:
+                inforec["incompat_licenses"].append(l)
 
     # check license compatibility of all direct, first-level children
     for soname in q:
@@ -99,15 +101,17 @@ def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, it
         # check child license compatibility
         if not license_is_compatible(opts, get_license(filedata), get_license(soname)):
             inforec["compatible"] = False
+            uniq_add(get_license(soname))
             culprit = True
             if break_on_incompatible:
                 break
 
         # tell our kid if he is the source of the license incompatibility (using 'culprit' param)
-        for dep in iter_over_dt_needed(opts, soname, filedata, culprit, iter_direction=iter_direction):
+        for dep in iter_over_dt_needed(opts, soname, filedata, culprit, get_all, break_on_incompatible):
             # now flip our bit to false if any of our children has incompatibilities
             if not dep["compatible"]:
                 inforec["compatible"] = False
+                #uniq_add(*dep["incompat_licenses"])
                 if break_on_incompatible:
                     break_on_incompatible = 2
                     break
@@ -115,27 +119,19 @@ def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, it
             # we have to check license compatility with all descendents, too
             if not license_is_compatible(opts, get_license(filedata), get_license(dep["filedata"])):
                 inforec["compatible"] = False
+                #uniq_add(get_license(dep["filedata"]))
                 dep["culprit"] = True
                 if break_on_incompatible:
                     break_on_incompatible = 2
                     break
 
-            dep["level"] = dep["level"] + 1
+            if get_all and dep["level"] < 254:
+                # increase level of our children
+                dep["level"] = dep["level"] + 1
+                yield dep
 
-            if get_all:
-                if iter_direction == iter_bottomup:
-                    yield dep
-                else:
-                    retlist.append(dep)
-
-            # prevent endless recursion (should never happen)
-            if dep["level"] > 256:
-                break
 
     yield inforec
-    if get_all and iter_direction == iter_topdown:
-        for i in retlist:
-            yield i
 
 
 # centralized place to set common sqlmeta class details

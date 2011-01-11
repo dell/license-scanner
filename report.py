@@ -74,7 +74,7 @@ def main():
     connect(opts)
 
     for fname in license_db.Filedata.select():
-        for info in license_db.iter_over_dt_needed(opts, fname):
+        for info in reversed(list(license_db.iter_over_dt_needed(opts, fname))):
             interpolate = {}
             interpolate["basename"] = info["filedata"].basename
             interpolate["license"]  = license_db.get_license(info["filedata"])
