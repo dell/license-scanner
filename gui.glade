@@ -41,8 +41,8 @@
                     <child>
                       <object class="GtkImageMenuItem" id="imagemenuitem5">
                         <property name="visible">True</property>
-                        <property name="related_action">action_quit</property>
                         <property name="use_action_appearance">True</property>
+                        <property name="related_action">action_quit</property>
                         <property name="use_underline">True</property>
                         <property name="use_stock">True</property>
                       </object>
@@ -83,8 +83,8 @@
             <child>
               <object class="GtkToolButton" id="toolbutton_quit">
                 <property name="visible">True</property>
-                <property name="related_action">action_quit</property>
                 <property name="use_action_appearance">True</property>
+                <property name="related_action">action_quit</property>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -94,8 +94,8 @@
             <child>
               <object class="GtkToolButton" id="toolbutton_save">
                 <property name="visible">True</property>
-                <property name="related_action">action_save</property>
                 <property name="use_action_appearance">True</property>
+                <property name="related_action">action_save</property>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -105,8 +105,8 @@
             <child>
               <object class="GtkToggleToolButton" id="toolbutton_show_all">
                 <property name="visible">True</property>
-                <property name="related_action">action_show_all</property>
                 <property name="use_action_appearance">True</property>
+                <property name="related_action">action_show_all</property>
                 <property name="label" translatable="yes">toolbutton1</property>
                 <property name="use_underline">True</property>
               </object>
@@ -139,6 +139,7 @@
                     <property name="sizing">fixed</property>
                     <property name="fixed_width">150</property>
                     <property name="title">File</property>
+                    <property name="expand">True</property>
                     <child>
                       <object class="GtkCellRendererText" id="cellrenderer_file"/>
                       <attributes>
@@ -164,8 +165,9 @@
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_license">
                     <property name="resizable">True</property>
                     <property name="sizing">fixed</property>
-                    <property name="title">License</property>
                     <property name="fixed_width">192</property>
+                    <property name="title">License</property>
+                    <property name="expand">True</property>
                     <child>
                       <object class="GtkCellRendererText" id="cellrenderertext_license"/>
                       <attributes>
@@ -178,8 +180,8 @@
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_signoff">
                     <property name="resizable">True</property>
                     <property name="sizing">fixed</property>
-                    <property name="title">Signoff</property>
                     <property name="fixed_width">150</property>
+                    <property name="title">Signoff</property>
                     <child>
                       <object class="GtkCellRendererText" id="cellrenderertext_signoff"/>
                       <attributes>
@@ -192,8 +194,9 @@
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_comment">
                     <property name="resizable">True</property>
                     <property name="sizing">fixed</property>
-                    <property name="title">Comment</property>
                     <property name="fixed_width">150</property>
+                    <property name="title">Comment</property>
+                    <property name="expand">True</property>
                     <child>
                       <object class="GtkCellRendererText" id="cellrenderertext_comment"/>
                       <attributes>
