@@ -57,6 +57,9 @@ class MyTreeModel(gtk.GenericTreeModel):
     def __init__(self, *args, **kargs):
         gtk.GenericTreeModel.__init__(self)
         self.fd = license_db.Filedata
+        self.query_all = self.fd.select()
+        #self.query_only_direct = self.fd.select()
+        self.default_query = self.query_all
 
     decorate(traceLog())
     def on_get_flags(self):
@@ -73,7 +76,7 @@ class MyTreeModel(gtk.GenericTreeModel):
 
     decorate(traceLog())
     def on_get_iter(self, path):
-        q = self.fd.select()
+        q = self.default_query
         retval = {"query": q, "path": path, "count": q.count()}
         pathcopy = copy.copy(path)
         # iterate while there are children and there are path elements left
@@ -136,7 +139,7 @@ class MyTreeModel(gtk.GenericTreeModel):
                 if info["compatible"]:
                     return gtk.STOCK_YES
                 elif info["incompat_licenses"]:
-                    return gtk.STOCK_REDO
+                    return gtk.STOCK_CANCEL
                 return gtk.STOCK_NO
         elif column == self.columns["bad_license_list"]:
             # iter, but will only ever return one record
@@ -192,25 +195,25 @@ class LicenseScanApp(object):
         self.opts = opts
 
         # initialize from glade
-        builder = gtk.Builder()
-        builder.add_from_file("gui.glade")
-        builder.connect_signals(self)
+        self.builder = gtk.Builder()
+        self.builder.add_from_file("gui.glade")
+        self.builder.connect_signals(self)
 
         # get main objects
-        self.window = builder.get_object("window")
-        self.statusbar = builder.get_object("treestore")
-        self.treestore = builder.get_object("treestore")
-        self.treeview = builder.get_object("treeview")
-        self.popup    = builder.get_object("popup_menu")
+        self.window = self.builder.get_object("window")
+        self.statusbar = self.builder.get_object("treestore")
+        self.treestore = self.builder.get_object("treestore")
+        self.treeview = self.builder.get_object("treeview")
+        self.popup    = self.builder.get_object("popup_menu")
 
         # Set up model
         self.treemodel = MyTreeModel()
         self.treeview.set_model(model=self.treemodel)
 
         # actions
-        self.global_actions = builder.get_object("global_actions")
-        self.action_quit = builder.get_object("action_quit")
-        self.action_save = builder.get_object("action_save")
+        self.global_actions = self.builder.get_object("global_actions")
+        self.action_quit = self.builder.get_object("action_quit")
+        self.action_save = self.builder.get_object("action_save")
         for action in (self.action_quit, self.action_save):
             self.global_actions.add_action(action)
 
