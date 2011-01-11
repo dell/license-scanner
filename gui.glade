@@ -15,7 +15,7 @@
     </columns>
   </object>
   <object class="GtkWindow" id="window">
-    <property name="default_width">640</property>
+    <property name="default_width">700</property>
     <property name="default_height">520</property>
     <signal name="destroy" handler="on_window_destroy"/>
     <child>
@@ -131,10 +131,13 @@
               <object class="GtkTreeView" id="treeview">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
+                <property name="fixed_height_mode">True</property>
                 <signal name="button_press_event" handler="on_treeview_button_press_event"/>
                 <child>
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_file">
                     <property name="resizable">True</property>
+                    <property name="sizing">fixed</property>
+                    <property name="fixed_width">150</property>
                     <property name="title">File</property>
                     <child>
                       <object class="GtkCellRendererText" id="cellrenderer_file"/>
@@ -146,6 +149,8 @@
                 </child>
                 <child>
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_icon">
+                    <property name="sizing">fixed</property>
+                    <property name="fixed_width">56</property>
                     <property name="title">Status</property>
                     <child>
                       <object class="GtkCellRendererPixbuf" id="cellrenderer_icon"/>
@@ -158,7 +163,9 @@
                 <child>
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_license">
                     <property name="resizable">True</property>
+                    <property name="sizing">fixed</property>
                     <property name="title">License</property>
+                    <property name="fixed_width">192</property>
                     <child>
                       <object class="GtkCellRendererText" id="cellrenderertext_license"/>
                       <attributes>
@@ -170,7 +177,9 @@
                 <child>
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_signoff">
                     <property name="resizable">True</property>
+                    <property name="sizing">fixed</property>
                     <property name="title">Signoff</property>
+                    <property name="fixed_width">150</property>
                     <child>
                       <object class="GtkCellRendererText" id="cellrenderertext_signoff"/>
                       <attributes>
@@ -182,7 +191,9 @@
                 <child>
                   <object class="GtkTreeViewColumn" id="treeviewcolumn_comment">
                     <property name="resizable">True</property>
+                    <property name="sizing">fixed</property>
                     <property name="title">Comment</property>
+                    <property name="fixed_width">150</property>
                     <child>
                       <object class="GtkCellRendererText" id="cellrenderertext_comment"/>
                       <attributes>
