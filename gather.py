@@ -69,8 +69,6 @@ def add_cli_options(parser):
     group.add_option("--cmd-objdump", action="store", dest="cmd_objdump", help="specify objdump command", default="objdump")
     group.add_option("--cmd-nm", action="store", dest="cmd_nm", help="specify nm command", default="nm")
     group.add_option("--cmd-scanelf", action="store", dest="cmd_scanelf", help="specify scanelf command", default="scanelf")
-    #group.add_option("--cmd-find", action="store", dest="cmd_find", help="specify find command", default="find")
-    #group.add_option("--cmd-rpm", action="store", dest="cmd_rpm", help="specify rpm command", default="rpm")
     parser.add_option_group(group)
 
 def check_prereqs(opts):
@@ -87,10 +85,12 @@ def get_license(opts, full_path):
         return ("LICENSE_RPM", h['license'])
 
 decorate(traceLog())
-def gather_data(opts, dirpath, basename):
+def gather_data(opts, dirpath, basename, *args, **kargs):
     moduleLog.info("Gather: %s" % os.path.join(dirpath,basename))
     full_path=os.path.join(dirpath, basename)
     data = {"full_path": full_path, "basename": basename}
+    for key,value in kargs.items():
+        data[key]=value
     data["FILE"] = call_output( [opts.cmd_file, "-b", full_path] ).strip()
     if opts.gather_lots:
         data["NM"] = call_output( [opts.cmd_nm, full_path] ).strip()
@@ -114,12 +114,12 @@ def gather_data(opts, dirpath, basename):
 # a function to gather data for a filename where we dont know if it exists
 # search standard paths and gather there if found
 decorate(traceLog())
-def gather_data_libs(opts, basename):
+def gather_data_libs(opts, basename, *args, **kargs):
     check_paths = [ '/lib', '/lib64', '/usr/lib', '/usr/lib64' ]
     for i in check_paths:
         candidate_path = os.path.join(i, basename)
         if os.path.exists(candidate_path):
-            return gather_data(opts, i, basename)
+            return gather_data(opts, i, basename, *args, **kargs)
 
 decorate(traceLog())
 def insert_data(data):
@@ -241,13 +241,6 @@ def main():
         except Queue.Empty, e:
             pass
 
-    # initial loop to scan all files in the input directory
-    for dir_to_process in opts.inputdir:
-        for dirpath, dirnames, filenames in os.walk(dir_to_process):
-            for basename in filenames:
-                task_queue.put((gather_data, [opts, dirpath, basename], {}))
-                process_one(done_queue, insert_data, interval_timer, block=False)
-
     # a function that waits for all previously-submitted work to complete before
     # going on. Returns True if any records were inserted
     def wait_for_completion():
@@ -260,6 +253,13 @@ def main():
                 inserted_something = True
         return inserted_something
 
+    # initial loop to scan all files in the input directory
+    for dir_to_process in opts.inputdir:
+        for dirpath, dirnames, filenames in os.walk(dir_to_process):
+            for basename in filenames:
+                task_queue.put((gather_data, [opts, dirpath, basename], {"DIRECT":"yes"}))
+                process_one(done_queue, insert_data, interval_timer, block=False)
+
     # Then we have to make sure we get data for each of the sonames we found
     wait_for_completion()
     inserted_something = True
@@ -270,7 +270,7 @@ def main():
         moduleLogVerbose.debug("Scan sonames, pass %s" % pass_no)
         for soname in license_db.Soname.select():
             moduleLogVerbose.debug("ensuring data for soname: %s" % soname.soname)
-            task_queue.put((gather_data_libs, [opts, soname.soname], {}))
+            task_queue.put((gather_data_libs, [opts, soname.soname], {"DIRECT":"no"}))
             if process_one(done_queue, insert_data, interval_timer, block=False):
                 inserted_something = True
         if wait_for_completion():
