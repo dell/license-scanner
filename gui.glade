@@ -92,10 +92,23 @@
               </packing>
             </child>
             <child>
-              <object class="GtkToolButton" id="toolbutton1">
+              <object class="GtkToolButton" id="toolbutton_save">
                 <property name="visible">True</property>
                 <property name="related_action">action_save</property>
                 <property name="use_action_appearance">True</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="homogeneous">True</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkToggleToolButton" id="toolbutton_show_all">
+                <property name="visible">True</property>
+                <property name="related_action">action_show_all</property>
+                <property name="use_action_appearance">True</property>
+                <property name="label" translatable="yes">toolbutton1</property>
+                <property name="use_underline">True</property>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -232,5 +245,12 @@
     <property name="stock_id">gtk-save</property>
     <property name="is_important">True</property>
     <signal name="activate" handler="on_action_save_activate"/>
+  </object>
+  <object class="GtkToggleAction" id="action_show_all">
+    <property name="label">Show _all records</property>
+    <property name="short_label">Show All</property>
+    <property name="tooltip">Should we show all files found, or only those specifically scanned.</property>
+    <property name="stock_id">gtk-zoom-in</property>
+    <property name="active">True</property>
   </object>
 </interface>
