@@ -77,9 +77,11 @@ def license_is_compatible(opts, lic1, lic2):
         return True
     return False
 
-# some constants for our users
-iter_topdown = 0
-iter_bottomup = 1 # (more efficient, but results in opposite order from normal display order)
+def iter_over_dt_needed_nonrecursive(opts, filedata, parent=None):
+    from license_db import DtNeededList
+    q = DtNeededList.select( DtNeededList.q.Filedata == filedata.id ).throughTo.Soname.throughTo.has_soname
+    for soname in q:
+        yield soname
 
 decorate(traceLog())
 def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, break_on_incompatible=0):

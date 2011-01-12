@@ -50,12 +50,14 @@ def validate_args(opts, args):
 
 
 def add_cli_options(parser):
-    group = OptionGroup(parser, "Scan control")
+    group = OptionGroup(parser, "General Options")
     parser.add_option("-d", "--database-directory", action="store", dest="database_dir", help="specify input directory", default=None)
+    parser.add_option("--text-output", action="store_const", const="text", dest="output_fmt", help="specify text output format (default)", default="text")
+    parser.add_option("--html-output", action="store_const", const="html", dest="output_fmt", help="specify html output format")
     parser.add_option_group(group)
 
-    group = OptionGroup(parser, "General Options")
-    parser.add_option_group(group)
+    #group = OptionGroup(parser, "General Options")
+    #parser.add_option_group(group)
 
 
 decorate(traceLog())
@@ -73,21 +75,64 @@ def main():
     moduleLogVerbose.debug("Connecting to database.")
     connect(opts)
 
+    format_strings = { "html": {
+            "prefix": "<html><head></head><body><ol>",
+            "suffix": "</ol></body>",
+            "increase_level": "<ol>",
+            "decrease_level": "</ol>",
+            "fmt_incompatible": "<li><font color='darkred'>{basename}    **(({license}))</font></li>",
+            "fmt_culprit":      "<li><font color='red'>{basename}    -->(({license}))</font></li>",
+            "fmt_ok":           "<li>{basename}    [{license}]</li>"
+        },
+        "text": {
+            "prefix": None,
+            "suffix": None,
+            "increase_level": None,
+            "decrease_level": None,
+            "fmt_incompatible": "{level}{basename}\t**(({license}))",
+            "fmt_culprit":      "{level}{basename}\t-->(({license}))",
+            "fmt_ok":           "{level}{basename}\t    [{license}]",
+            "post_per_exe": "",
+        }}
+
+    str_list = format_strings[opts.output_fmt]
+
+    def log_if_not_empty(s, *args, **kargs):
+        msg = str_list.get(s, None)
+        if msg is not None:
+            moduleLog.warning(msg.format(*args, **kargs))
+
+    log_if_not_empty("prefix")
     for fname in license_db.Filedata.select():
+        level = 0
+        log_if_not_empty("pre_per_exe")
         for info in reversed(list(license_db.iter_over_dt_needed(opts, fname))):
             interpolate = {}
             interpolate["basename"] = info["filedata"].basename
             interpolate["license"]  = license_db.get_license(info["filedata"])
-            interpolate["level"]    = "    " * info["level"]
+            interpolate["level"]  = "    "*info["level"]
+
+            while info["level"] > level:
+                level = level + 1
+                log_if_not_empty("increase_level")
+
+            while info["level"] < level:
+                level = level - 1
+                log_if_not_empty("decrease_level")
 
             if not info["compatible"]:
-                fmtstring = "{level}{basename}    **(({license}))"
+                fmtstring = "fmt_incompatible"
             elif info["culprit"]:
-                fmtstring = "{level}{basename}    -->(({license}))"
+                fmtstring = "fmt_culprit"
             else:
-                fmtstring = "{level}{basename}    [{license}]"
+                fmtstring = "fmt_ok"
 
-            moduleLog.warning(fmtstring.format(**interpolate))
+            log_if_not_empty(fmtstring, **interpolate)
+        while level > 0:
+            level = level - 1
+            log_if_not_empty("decrease_level")
+        log_if_not_empty("post_per_exe")
+    log_if_not_empty("suffix")
 
     sqlobject.sqlhub.processConnection.close()
 
