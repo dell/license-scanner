@@ -119,7 +119,7 @@ def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, br
             # we have to check license compatility with all descendents, too
             if not license_is_compatible(opts, get_license(filedata), get_license(dep["filedata"])):
                 inforec["compatible"] = False
-                #uniq_add(get_license(dep["filedata"]))
+                uniq_add(get_license(dep["filedata"]))
                 dep["culprit"] = True
                 if break_on_incompatible:
                     break_on_incompatible = 2
