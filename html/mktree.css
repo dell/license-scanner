@@ -13,9 +13,4 @@
 	/* Sublists are visible or not based on class of parent LI */
 	ul.mktree  li.liOpen    ul { display: block; }
 	ul.mktree  li.liClosed  ul { display: none; }
-	/* Format menu items differently depending on what level of the tree they are in */
-	ul.mktree  li { font-size: 12pt; }
-	ul.mktree  li ul li { font-size: 10pt; }
-	ul.mktree  li ul li ul li { font-size: 8pt; }
-	ul.mktree  li ul li ul li ul li { font-size: 6pt; }
 }
