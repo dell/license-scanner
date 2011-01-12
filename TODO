@@ -1,6 +1,7 @@
 General
     - add ability to distinguish 32- from 64-bit executables and dependencies
     - add ability to scan windows format executables
+    - add ability to scan java executables
 
 GUI
     - Add file-load dialog box to load
