@@ -98,12 +98,13 @@ def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, br
     filedata_license = get_license(filedata)
     indent = "  " * recurse_level
     recurse_level = recurse_level + 1
-    #moduleLogVerbose.debug("%siter %s dt_needed" % (indent, filedata.basename))
 
     if seen is None: seen={}
-    if seen.get(filedata.basename) is not None:
+    if seen.get(filedata.id) is not None:
         moduleLogVerbose.debug("%s  --already-seen--> **%s" % (indent, filedata.basename))
-        yield seen.get(filedata.basename)
+        inforec["compatible"] = seen.get(filedata.id)["compatible"]
+        inforec["incompat_licenses"] = seen.get(filedata.id)["incompat_licenses"]
+        yield inforec
         raise StopIteration()
 
     # check license compatibility of all direct, first-level children
@@ -147,7 +148,7 @@ def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, br
                 dep["level"] = dep["level"] + 1
                 yield dep
 
-    seen[inforec["filedata"].basename] = inforec
+    seen[inforec["filedata"].id] = inforec
     yield inforec
 
 
