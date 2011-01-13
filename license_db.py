@@ -90,12 +90,6 @@ def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, br
     retlist = []
     inforec = { "level": 0, "culprit": myfault, "compatible": True, "filedata": filedata, 'incompat_licenses':[] }
 
-    # if we have previously already enumerated all children, no need to do it again
-    if seen is None: seen=[]
-#    if filedata.id in seen:
-#        raise StopIteration()
-#    seen.append(filedata.id)
-
     def uniq_add(*args):
         for l in args:
             if l not in  inforec["incompat_licenses"]:
@@ -106,9 +100,15 @@ def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, br
     recurse_level = recurse_level + 1
     #moduleLogVerbose.debug("%siter %s dt_needed" % (indent, filedata.basename))
 
+    if seen is None: seen={}
+    if seen.get(filedata.basename) is not None:
+        moduleLogVerbose.debug("%s  --already-seen--> **%s" % (indent, filedata.basename))
+        yield seen.get(filedata.basename)
+        raise StopIteration()
+
     # check license compatibility of all direct, first-level children
     for soname in q:
-        moduleLogVerbose.debug("%s  --> %s" % (indent, soname.basename))
+        moduleLogVerbose.debug("%s  --> %s seen(%s)" % (indent, soname.basename, seen.keys()))
         if break_on_incompatible > 2:
             break
         culprit = False
@@ -141,11 +141,13 @@ def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, br
                     break_on_incompatible = 2
                     break
 
+            # dont recurse more than 32 levels
             if get_all and dep["level"] < 32:
                 # increase level of our children
                 dep["level"] = dep["level"] + 1
                 yield dep
 
+    seen[inforec["filedata"].basename] = inforec
     yield inforec
 
 
