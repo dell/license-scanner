@@ -109,7 +109,12 @@ def main():
             moduleLog.warning(msg.format(*args, **kargs))
 
     log_if_not_empty("prefix")
-    for fname in license_db.Filedata.select():
+    from license_db import Filedata, DtNeededList
+    from sqlobject.sqlbuilder import EXISTS, Select, Outer
+    # only query things that actually have dependencies
+    for fname in license_db.Filedata.select(
+        EXISTS(Select(DtNeededList.q.Filedata, where=(Outer(Filedata).q.id == DtNeededList.q.Filedata)))
+            ):
         level = 0
         opened = 0
         log_if_not_empty("pre_per_exe")
