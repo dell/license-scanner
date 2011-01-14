@@ -3,7 +3,9 @@
 import os
 import sqlobject
 import copy
+import csv
 from optparse import OptionGroup
+from sqlobject.sqlbuilder import EXISTS, Select, Outer
 
 import pygtk
 pygtk.require("2.0")
@@ -15,7 +17,7 @@ import basic_cli
 import license_db
 import gather
 import report
-from license_db import DtNeededList
+from license_db import DtNeededList, Filedata
 
 __VERSION__="1.0"
 
@@ -63,7 +65,13 @@ class MyTreeModel(gtk.GenericTreeModel):
         return DtNeededList.select( DtNeededList.q.filedata == row_id ).throughTo.soname.throughTo.has_soname
 
     def _query_all_filedata(self):
-        return self.fd.select()
+        #return self.fd.select()
+        return Filedata.select(
+                # only query things that actually have dependencies
+                EXISTS(Select(DtNeededList.q.filedata, where=(Outer(Filedata).q.id == DtNeededList.q.filedata))),
+                # sort by filename
+                orderBy=Filedata.q.basename
+                )
 
     decorate(traceLog())
     def on_get_flags(self):
@@ -263,7 +271,6 @@ class LicenseScanApp(object):
         gtk.main_quit()
 
     def on_action_save_activate(self, *args, **kargs):
-        import csv
         fd = open("OUTFILE.csv", "wb+")
         fd.write('LICENSE,COMPAT_LICENSE\n')
         fd.flush()
