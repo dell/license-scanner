@@ -60,6 +60,7 @@ class MyTreeModel(gtk.GenericTreeModel):
     def __init__(self, *args, **kargs):
         gtk.GenericTreeModel.__init__(self)
         self.fd = license_db.Filedata
+        self.shortcut_display = 1
 
     def _query_deps(self, row_id):
         return DtNeededList.select( DtNeededList.q.filedata == row_id ).throughTo.soname.throughTo.has_soname
@@ -75,7 +76,7 @@ class MyTreeModel(gtk.GenericTreeModel):
 
     decorate(traceLog())
     def on_get_flags(self):
-        return 0
+        return gtk.TREE_MODEL_ITERS_PERSIST
         #return gtk.TREE_MODEL_LIST_ONLY | gtk.TREE_MODEL_ITERS_PERSIST
 
     decorate(traceLog())
@@ -89,49 +90,40 @@ class MyTreeModel(gtk.GenericTreeModel):
     decorate(traceLog())
     def on_get_iter(self, path):
         q = self._query_all_filedata()
-        retval = {"query": q, "path": path, "count": q.count()}
-        pathcopy = copy.copy(path)
+        retval = {"query": None, "path": path, "count": None, "iter": None, "row": None, "cache":{}}
         # iterate while there are children and there are path elements left
-        while retval["count"] and len(pathcopy)>1:
+        for p in path:
+            count = q.count()
+            if count == 0:
+                return None
+
             # progressively chop off parts of the path to traverse down
-            p = pathcopy[0]
-            pathcopy = pathcopy[1:]
-            try:
-                row = q[p:p+1].getOne()
-            except sqlobject.main.SQLObjectNotFound, e:
-                break
+            retval["iter"] = iter(q[p:99999])
+            retval["query"] = q
+            retval["count"] = count
+            retval["row"] = retval["iter"].next()
 
             # set the query to the list of children
-            q = self._query_deps(row.id)
-            retval = {"query": q, "path": path, "count": q.count()}
+            q = self._query_deps(retval["row"].id)
 
-        if retval is not None and retval["count"]:
-            return retval
-        else:
-            return None
+        return retval
 
     decorate(traceLog())
     def on_get_path(self, rowref):
         return rowref["path"]
 
     decorate(traceLog())
-    def get_filedata_from_rowref_iter(self, rowref):
-        q = rowref["query"]
-        p = rowref["path"][-1]
-        try:
-            return q[p:p+1].getOne()
-        except sqlobject.main.SQLObjectNotFound, e:
-            #should never happen
-            return None
-
-    decorate(traceLog())
     def on_get_value(self, rowref, column):
-        filedata = self.get_filedata_from_rowref_iter(rowref)
+        filedata = rowref["row"]
         if filedata is None:
             return "nonexistent row: %s" % repr(rowref["path"])
 
         if column == self.columns["basename"]:
             return filedata.basename
+
+        elif self.shortcut_display == 1:
+            return ""
+
         elif column == self.columns["license"]:
             return license_db.get_license(filedata)
         elif column == self.columns["signoff"]:
@@ -160,9 +152,13 @@ class MyTreeModel(gtk.GenericTreeModel):
     decorate(traceLog())
     def on_iter_next(self, rowref):
         # increment last element
-        rowref["path"] = rowref["path"][:-1] + (rowref["path"][-1]+1,)
-        if rowref["path"][-1] < rowref["count"]:
+        try:
+            rowref["path"] = rowref["path"][:-1] + (rowref["path"][-1]+1,)
+            rowref["row"] = rowref["iter"].next()
+            rowref["cache"] = {}
             return rowref
+        except StopIteration, e:
+            pass
 
     decorate(traceLog())
     def on_iter_children(self, rowref):
@@ -174,15 +170,16 @@ class MyTreeModel(gtk.GenericTreeModel):
 
     decorate(traceLog())
     def on_iter_has_child(self, rowref):
-        rowref = self.on_get_iter( rowref["path"] + (0,) )
-        if rowref is not None:
-            return True
-        return False
+        return self.on_iter_n_children(rowref) > 0
 
     decorate(traceLog())
     def on_iter_n_children(self, rowref):
-        rowref = self.on_get_iter( rowref["path"] + (0,) )
-        return rowref["count"]
+        cached_child_count = rowref["cache"].get("cached_child_count")
+        if cached_child_count is None:
+            q = self._query_deps(rowref["row"].id)
+            cached_child_count = q.count()
+            rowref["cache"]["cached_child_count"] = cached_child_count
+        return cached_child_count
 
     decorate(traceLog())
     def on_iter_nth_child(self, parent, n):
@@ -190,7 +187,14 @@ class MyTreeModel(gtk.GenericTreeModel):
         if not parent:
             return self.on_get_iter( (n,) )
 
-        return self.on_get_iter( parent["path"] + (n,) )
+        q = self._query_deps(parent["row"].id)
+        count = q.count()
+        if count and n < count:
+            parent["iter"] = iter(q[n:99999])
+            parent["query"] = q
+            parent["count"] = count
+            parent["row"] = parent["iter"].next()
+            return parent
 
     decorate(traceLog())
     def on_iter_parent(self, rowref):
@@ -290,7 +294,6 @@ if __name__ == "__main__":
     # DO NOT LOG BEFORE THIS CALL:
     basic_cli.setupLogging(opts)
 
-    moduleLogVerbose.debug("Connecting to database.")
     connect(opts)
 
     app = LicenseScanApp(opts)
