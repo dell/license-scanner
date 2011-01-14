@@ -59,7 +59,6 @@ def get_license_soname(soname, preferred=None):
             return lic
 
     # then match just basename
-    from license_db import Filedata
     moduleLogVerbose.debug("query by soname failed for %s." % soname.soname)
     for fd in Filedata.select( Filedata.q.basename == soname.soname ):
         moduleLogVerbose.debug("try to get license by %s" % fd.full_path)
@@ -79,14 +78,14 @@ def license_is_compatible(opts, lic1, lic2):
 
 def iter_over_dt_needed_nonrecursive(opts, filedata, parent=None):
     from license_db import DtNeededList
-    q = DtNeededList.select( DtNeededList.q.Filedata == filedata.id ).throughTo.Soname.throughTo.has_soname
+    q = DtNeededList.select( DtNeededList.q.filedata == filedata.id ).throughTo.soname.throughTo.has_soname
     for soname in q:
         yield soname
 
 decorate(traceLog())
 def iter_over_dt_needed(opts, filedata, parent=None, myfault=0, get_all=True, break_on_incompatible=0, recurse_level=0, seen=None):
     from license_db import DtNeededList
-    q = DtNeededList.select( DtNeededList.q.Filedata == filedata.id ).throughTo.Soname.throughTo.has_soname
+    q = DtNeededList.select( DtNeededList.q.filedata == filedata.id ).throughTo.soname.throughTo.has_soname
     retlist = []
     inforec = { "level": 0, "culprit": myfault, "compatible": True, "filedata": filedata, 'incompat_licenses':[] }
 
@@ -175,13 +174,13 @@ class Soname(sqlobject.SQLObject):
 
 class DtNeededList(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
-    Filedata = sqlobject.ForeignKey('Filedata', cascade=True)
-    Soname = sqlobject.ForeignKey('Soname', cascade=True)
+    filedata = sqlobject.ForeignKey('Filedata', cascade=True)
+    soname = sqlobject.ForeignKey('Soname', cascade=True)
 
 class SonameList(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
-    Soname = sqlobject.ForeignKey('Soname', cascade=True)
-    Filedata = sqlobject.ForeignKey('Filedata', cascade=True)
+    soname = sqlobject.ForeignKey('Soname', cascade=True)
+    filedata = sqlobject.ForeignKey('Filedata', cascade=True)
 
 class License(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass

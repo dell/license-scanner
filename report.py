@@ -27,6 +27,7 @@ from trace_decorator import decorate, traceLog, getLog
 import basic_cli
 import license_db
 import gather
+from license_db import Filedata, DtNeededList
 
 __VERSION__="1.0"
 
@@ -109,11 +110,11 @@ def main():
             moduleLog.warning(msg.format(*args, **kargs))
 
     log_if_not_empty("prefix")
-    from license_db import Filedata, DtNeededList
     from sqlobject.sqlbuilder import EXISTS, Select, Outer
     # only query things that actually have dependencies
     for fname in license_db.Filedata.select(
-        EXISTS(Select(DtNeededList.q.Filedata, where=(Outer(Filedata).q.id == DtNeededList.q.Filedata)))
+        EXISTS(Select(DtNeededList.q.filedata, where=(Outer(Filedata).q.id == DtNeededList.q.filedata))),
+        orderBy=Filedata.q.basename
             ):
         level = 0
         opened = 0
