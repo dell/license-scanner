@@ -15,6 +15,7 @@ import basic_cli
 import license_db
 import gather
 import report
+from license_db import DtNeededList
 
 __VERSION__="1.0"
 
@@ -57,9 +58,12 @@ class MyTreeModel(gtk.GenericTreeModel):
     def __init__(self, *args, **kargs):
         gtk.GenericTreeModel.__init__(self)
         self.fd = license_db.Filedata
-        self.query_all = self.fd.select()
-        #self.query_only_direct = self.fd.select()
-        self.default_query = self.query_all
+
+    def _query_deps(self, row_id):
+        return DtNeededList.select( DtNeededList.q.filedata == row_id ).throughTo.soname.throughTo.has_soname
+
+    def _query_all_filedata(self):
+        return self.fd.select()
 
     decorate(traceLog())
     def on_get_flags(self):
@@ -76,7 +80,7 @@ class MyTreeModel(gtk.GenericTreeModel):
 
     decorate(traceLog())
     def on_get_iter(self, path):
-        q = self.default_query
+        q = self._query_all_filedata()
         retval = {"query": q, "path": path, "count": q.count()}
         pathcopy = copy.copy(path)
         # iterate while there are children and there are path elements left
@@ -90,8 +94,7 @@ class MyTreeModel(gtk.GenericTreeModel):
                 break
 
             # set the query to the list of children
-            from license_db import DtNeededList
-            q = DtNeededList.select( DtNeededList.q.Filedata == row.id ).throughTo.Soname.throughTo.has_soname
+            q = self._query_deps(row.id)
             retval = {"query": q, "path": path, "count": q.count()}
 
         if retval is not None and retval["count"]:
