@@ -111,9 +111,10 @@ def main():
 
     log_if_not_empty("prefix")
     from sqlobject.sqlbuilder import EXISTS, Select, Outer
-    # only query things that actually have dependencies
-    for fname in license_db.Filedata.select(
+    for fname in Filedata.select(
+        # only query things that actually have dependencies
         EXISTS(Select(DtNeededList.q.filedata, where=(Outer(Filedata).q.id == DtNeededList.q.filedata))),
+        # sort by filename
         orderBy=Filedata.q.basename
             ):
         level = 0
