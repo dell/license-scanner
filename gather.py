@@ -29,6 +29,7 @@ from optparse import OptionGroup
 from trace_decorator import decorate, traceLog, getLog
 import basic_cli
 import license_db
+from license_db import Filedata, Soname, License, Tag
 
 __VERSION__="1.0"
 
@@ -126,7 +127,6 @@ def insert_data(data):
     if data is None: return
     created_something = False
 
-    from license_db import Filedata, Soname, License, Tag
     res = Filedata.select( Filedata.q.full_path == data["full_path"] )
     if res.count():
         moduleLogVerbose.debug("UPDATE: %s" % data["basename"])
@@ -268,7 +268,7 @@ def main():
         inserted_something = False
         pass_no=pass_no + 1
         moduleLogVerbose.debug("Scan sonames, pass %s" % pass_no)
-        for soname in license_db.Soname.select():
+        for soname in Soname.select():
             moduleLogVerbose.debug("ensuring data for soname: %s" % soname.soname)
             task_queue.put((gather_data_libs, [opts, soname.soname], {"DIRECT":"no"}))
             if process_one(done_queue, insert_data, interval_timer, block=False):
