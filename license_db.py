@@ -190,8 +190,8 @@ class License(sqlobject.SQLObject):
 
 class FiledataLicense(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
-    License = sqlobject.ForeignKey('License', cascade=True)
-    Filedata = sqlobject.ForeignKey('Filedata', cascade=True)
+    license = sqlobject.ForeignKey('License', cascade=True)
+    filedata = sqlobject.ForeignKey('Filedata', cascade=True)
 
 class Tag(sqlobject.SQLObject):
     class sqlmeta(myMeta): pass
