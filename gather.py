@@ -255,6 +255,13 @@ def main():
 
     # initial loop to scan all files in the input directory
     for dir_to_process in opts.inputdir:
+        if os.path.isfile( dir_to_process ):
+            dirpath = os.path.dirname(dir_to_process)
+            basename = os.path.basename(dir_to_process)
+            task_queue.put((gather_data, [opts, dirpath, basename], {"DIRECT":"yes"}))
+            process_one(done_queue, insert_data, interval_timer, block=False)
+            continue
+
         for dirpath, dirnames, filenames in os.walk(dir_to_process):
             for basename in filenames:
                 task_queue.put((gather_data, [opts, dirpath, basename], {"DIRECT":"yes"}))
