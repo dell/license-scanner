@@ -72,26 +72,20 @@ class PrereqError(Exception): pass
 
 def validate_args(opts, args):
     #if opts.inputdir: opts.inputdir = os.path.realpath(opts.inputdir)
-    if opts.database_dir: opts.database_dir = os.path.realpath(opts.database_dir)
-    if opts.database_dir is None:
-        raise basic_cli.CLIError("Database directory is required.")
-
-    opts.dbpath = os.path.join(opts.database_dir, "sqlite.db")
-    if not os.path.exists(opts.dbpath):
-        raise basic_cli.CLIError("DB doesnt exist.")
-
+    if opts.dbconnstr is None:
+        raise basic_cli.CLIError("Database connection string is required.")
 
 def add_cli_options(parser):
     group = OptionGroup(parser, "General Options")
-    parser.add_option("-d", "--database-directory", action="store", dest="database_dir", help="specify input directory", default=None)
+    parser.add_option("-d", "--database", action="store", dest="dbconnstr", help="database connection string. default: '%default'", default='sqlite:///%s/report.db' % os.getcwd())
     parser.add_option("--text-output", action="store_const", const="text", dest="output_fmt", help="specify text output format (default)", default="text")
     parser.add_option("--html-output", action="store_const", const="html", dest="output_fmt", help="specify html output format")
     parser.add_option_group(group)
 
 decorate(traceLog())
 def connect(opts):
-    moduleLogVerbose.info("Connecting to db at %s" % opts.dbpath)
-    sqlobject.sqlhub.processConnection = sqlobject.connectionForURI('sqlite://%s' % opts.dbpath)
+    moduleLogVerbose.info("Connecting to db at %s" % opts.dbconnstr)
+    sqlobject.sqlhub.processConnection = sqlobject.connectionForURI(opts.dbconnstr)
 
 def main():
     parser = basic_cli.get_basic_parser(usage=__doc__, version="%prog " + __VERSION__)

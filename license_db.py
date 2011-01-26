@@ -8,21 +8,17 @@ moduleLogVerbose = getLog(prefix="verbose.")
 
 decorate(traceLog())
 def connect(opts):
-    if not os.path.exists(opts.dbpath):
-        opts.initdb = True
+    moduleLogVerbose.info("Connecting to db at %s" % opts.dbconnstr)
+    sqlobject.sqlhub.processConnection = sqlobject.connectionForURI(opts.dbconnstr)
+
+    for clas in iterTables():
+        if not clas.tableExists():
+            moduleLogVerbose.info("Some required tables do not exist. Forcing database initialization.")
+            opts.initdb = True
+            break
 
     if opts.initdb:
-        if os.path.exists(opts.dbpath):
-            moduleLogVerbose.info("unlinking old db: %s" % opts.dbpath)
-            os.unlink(opts.dbpath)
-
-        if os.path.dirname(opts.dbpath) and not os.path.exists(os.path.dirname(opts.dbpath)):
-            os.makedirs(os.path.dirname(opts.dbpath))
-
-    moduleLogVerbose.info("Connecting to db at %s" % opts.dbpath)
-    sqlobject.sqlhub.processConnection = sqlobject.connectionForURI('sqlite://%s' % opts.dbpath)
-
-    if opts.initdb:
+        dropTables()
         createTables()
 
 decorate(traceLog())
@@ -199,16 +195,24 @@ class Tag(sqlobject.SQLObject):
     tagname = sqlobject.StringCol()
     tagvalue = sqlobject.StringCol()
 
-def createTables():
+
+def iterTables():
     # fancy pants way to grab all classes in this file
     # that are descendents of SQLObject and run .createTable() on them.
-    toCreate = [ value for key, value in globals().items()
+    toCheck = [ value for key, value in globals().items()
             if     inspect.isclass(value)
                and value.__module__==__name__
                and issubclass(value, sqlobject.SQLObject)
          ]
+    for clas in toCheck:
+        yield clas
 
-    for clas in toCreate:
+def dropTables():
+    for clas in iterTables():
+        clas.dropTable(ifExists=True, dropJoinTables=True, cascade=True)
+
+def createTables():
+    for clas in iterTables():
         clas.createTable(ifNotExists=True, createJoinTables=False)
 
 

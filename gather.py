@@ -43,19 +43,16 @@ class PrereqError(Exception): pass
 
 def validate_args(opts, args):
     #if opts.inputdir: opts.inputdir = os.path.realpath(opts.inputdir)
-    if opts.outputdir: opts.outputdir = os.path.realpath(opts.outputdir)
     if opts.inputdir is None:
         raise basic_cli.CLIError("Input directory is required when gathering data.")
-    if opts.outputdir is None:
-        raise basic_cli.CLIError("Output directory is required.")
-
-    opts.dbpath = os.path.join(opts.outputdir, "sqlite.db")
+    if opts.dbconnstr is None:
+        raise basic_cli.CLIError("Database connection string is required.")
 
 
 def add_cli_options(parser):
     group = OptionGroup(parser, "Scan control")
     parser.add_option("-i", "--input-directory", action="append", dest="inputdir", help="input directory to scan", default=[])
-    parser.add_option("-o", "--output-directory", action="store", dest="outputdir", help="where to store database", default=None)
+    parser.add_option("-d", "--database", action="store", dest="dbconnstr", help="database connection string. default: '%default'", default='sqlite:///%s/report.db' % os.getcwd())
     parser.add_option("--gather-extra", action="store_true", dest="gather_lots", help="Gather extra data", default=False)
     parser.add_option_group(group)
 
@@ -222,10 +219,6 @@ def main():
 
     moduleLogVerbose.debug("Connecting to database.")
     license_db.connect(opts)
-
-    if not os.path.exists(opts.outputdir):
-        moduleLog.warning("Output directory (%s) does not exist, creating." % opts.outputdir)
-        os.makedirs(opts.outputdir)
 
     moduleLog.info("Starting gather run.")
     connection = sqlobject.sqlhub.processConnection
