@@ -1,0 +1,110 @@
+
+Theory of operation:
+
+The license reporting tool operates in two passes.
+
+Step 1: gather. This step gathers information about the specified files. You may specify a specific file to analyze, or a directory. If a directory is specified, gather will walk down the directory tree ananalyze all files contained there. By default, gather will store it's intermediate results in sqlite database in the current working directory. See the cli help for how to specify a different directory.
+
+Step 2: report. This step produces a license compliance report using the existing database
+
+The reason it operates in two passes is to account for the situation where you have to have a third-party run a report on code that you do not have access to.
+
+Sample run:
+
+$ ./gather  -i /bin/ls
+Starting gather run. Gather version 1.0
+Gather: /bin/ls
+Gather: /lib/libselinux.so.1
+Gather: /lib/librt.so.1
+Gather: /lib/libcap.so.2
+Gather: /lib64/libacl.so.1
+Gather: /lib/libc.so.6
+Gather: /lib/libselinux.so.1
+Gather: /lib/librt.so.1
+Gather: /lib/libcap.so.2
+Gather: /lib64/libacl.so.1
+Gather: /lib/libc.so.6
+Gather: /lib/libdl.so.2
+Gather: /lib/ld-linux.so.2
+Gather: /lib/libpthread.so.0
+Gather: /lib/libattr.so.1
+Gather: /lib/libselinux.so.1
+Gather: /lib/librt.so.1
+Gather: /lib/libcap.so.2
+Gather: /lib64/libacl.so.1
+Gather: /lib/libc.so.6
+Gather: /lib/libdl.so.2
+Gather: /lib/ld-linux.so.2
+Gather: /lib/libpthread.so.0
+Gather: /lib/libattr.so.1
+Gather done
+
+$ ./report --license-compat ./sample-license-compat-list.csv
+libacl.so.1     [LGPLv2+]
+    libattr.so.1        [LGPLv2+]
+        libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+
+libattr.so.1        [LGPLv2+]
+    libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+
+libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+
+libcap.so.2     [LGPLv2+]
+    libattr.so.1        [LGPLv2+]
+        libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+
+libdl.so.2      [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+
+libpthread.so.0     [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+
+librt.so.1      [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    libpthread.so.0     [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+
+libselinux.so.1     [Public Domain]
+    ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    libdl.so.2      [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+
+ls  **((GPLv3+))
+    libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    libacl.so.1     [LGPLv2+]
+        libattr.so.1        [LGPLv2+]
+        libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    libcap.so.2     [LGPLv2+]
+        libattr.so.1        [LGPLv2+]
+            libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    librt.so.1      [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        libpthread.so.0     [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+            ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+            libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+    libselinux.so.1 -->((Public Domain))
+        ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        libdl.so.2      [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+            ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+            libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+        libc.so.6       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+            ld-linux.so.2       [LGPLv2+ and LGPLv2+ with exceptions and GPLv2+]
+

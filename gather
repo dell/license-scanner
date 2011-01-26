@@ -220,7 +220,7 @@ def main():
     moduleLogVerbose.debug("Connecting to database.")
     license_db.connect(opts)
 
-    moduleLog.info("Starting gather run.")
+    moduleLog.info("Starting gather run. Gather version %s" % __VERSION__)
     connection = sqlobject.sqlhub.processConnection
     trans = sqlobject.sqlhub.processConnection.transaction()
     sqlobject.sqlhub.processConnection = trans

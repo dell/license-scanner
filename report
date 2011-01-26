@@ -26,7 +26,6 @@ from trace_decorator import decorate, traceLog, getLog
 # our stuff
 import basic_cli
 import license_db
-import gather
 from license_db import Filedata, DtNeededList
 
 __VERSION__="1.0"
@@ -150,7 +149,7 @@ def main():
             interpolate["level"]  = "    " * info["level"]
             opened = opened + 1
             log_if_not_empty(fmtstring, **interpolate)
- 
+
         while level > 0:
             interpolate["opened"] = "    " * opened
             log_if_not_empty("end_item", **interpolate)
@@ -161,7 +160,7 @@ def main():
 
         interpolate["opened"] = "    " * opened
         log_if_not_empty("end_item", **interpolate)
-            
+
         log_if_not_empty("post_per_exe")
     log_if_not_empty("suffix")
 
